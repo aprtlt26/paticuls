@@ -99,8 +99,7 @@
 
                 this.shouldPlaySound = random(1) < 0.2;  // 20% de probabilidad de que tenga sonido activo
                 this.soundDuration = 10000;  // Duración del sonido en milisegundos
-                this.startTime = millis();  // Momento en que comienza el sonido
-                this.oscillator.start();  // Comenzar el oscilador
+                this.nextSoundTime = millis() + random(3000, 8000);  // Tiempo hasta que suene nuevamente
             }
 
             follow(vectors) {
@@ -123,18 +122,16 @@
 
                 // Controlar el sonido en función del tiempo
                 let currentTime = millis();
-                if (this.shouldPlaySound && currentTime - this.startTime <= this.soundDuration) {
-                    let elapsed = currentTime - this.startTime;
-                    if (elapsed < 500) {
-                        // Fade in al inicio
-                        this.oscillator.amp(0.5, 0.5);
-                    } else if (elapsed > this.soundDuration - 1000) {
-                        // Fade out al final
-                        this.oscillator.amp(0, 1);
+                if (this.shouldPlaySound && currentTime >= this.nextSoundTime) {
+                    this.oscillator.start();
+                    this.oscillator.amp(0.5, 0.5); // Fade in al inicio
+                    setTimeout(() => {
+                        this.oscillator.amp(0, 1); // Fade out al final
                         setTimeout(() => this.oscillator.stop(), 1000); // Apagar el oscilador después del fade out
-                    }
-                } else if (currentTime - this.startTime > this.soundDuration) {
-                    this.shouldPlaySound = false;  // Desactivar el sonido después de la duración
+                    }, this.soundDuration - 1000);
+
+                    // Configurar el próximo tiempo para que suene
+                    this.nextSoundTime = currentTime + random(3000, 8000);
                 }
             }
 
@@ -158,6 +155,7 @@
     </script>
 </body>
 </html>
+
 
 
 
