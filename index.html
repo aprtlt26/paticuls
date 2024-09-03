@@ -26,7 +26,6 @@
         let maxSpeed = 2;
         let audioStarted = false;
 
-        let delays = [];
         let reverb;
         let compressor;
 
@@ -36,30 +35,15 @@
             rows = floor(height / scl);
             flowfield = new Array(cols * rows);
 
-            // Configurar 4 delays
-            for (let i = 0; i < 4; i++) {
-                let delay = new p5.Delay();
-                delay.process(null, random(0.05, 0.15), 0.5, 2300); // tiempo, feedback, filtro
-                delays.push(delay);
-            }
-
-            // Configurar reverb
+            // Configurar reverb y compresor
             reverb = new p5.Reverb();
-            reverb.set(3, 2); // Tiempo de reverberación y desvanecimiento
-
-            // Configurar compresor
             compressor = new p5.Compressor();
+            reverb.drywet(0.5); // Mezcla de 50% entre sonido directo y reverberado
+            reverb.set(3, 2); // Tiempo de reverberación y desvanecimiento
             compressor.threshold(-12);
             compressor.ratio(2);
             compressor.attack(0.1);
             compressor.release(0.2);
-
-            // Aplicar efectos en cadena
-            for (let delay of delays) {
-                delay.connect(reverb);
-            }
-            reverb.connect(compressor);
-            compressor.connect();
 
             for (let i = 0; i < 500; i++) {
                 particles[i] = new Particle();
@@ -97,9 +81,9 @@
 
         function mousePressed() {
             if (!audioStarted) {
-                userStartAudio();
+                userStartAudio();  // Iniciar el contexto de audio
                 audioStarted = true;
-                loop();
+                loop();  // Comenzar el bucle de draw
             }
         }
 
@@ -116,14 +100,12 @@
                 this.oscillator.freq(random(100, 2200));
                 this.oscillator.amp(0.5);
                 
-                // Conectar el oscilador a uno de los delays
-                let selectedDelay = random(delays);
-                this.oscillator.connect(selectedDelay);
+                // Conectar oscilador a reverb y compresor
+                this.oscillator.disconnect();
+                this.oscillator.connect(reverb);
+                reverb.connect(compressor);
 
-                this.oscillator.start();
-                this.oscillator.stop(); // Iniciar parado
-                
-                this.shouldPlaySound = random(1) < 0.2; // 20% de probabilidad de que tenga sonido activo
+                this.shouldPlaySound = random(1) < 0.2;  // 20% de probabilidad de que tenga sonido activo
             }
 
             follow(vectors) {
@@ -170,8 +152,9 @@
             }
         }
 
-        noLoop();
+        noLoop();  // Evitar que el draw se ejecute hasta que el usuario interactúe
     </script>
 </body>
 </html>
+
 
