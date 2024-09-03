@@ -27,7 +27,6 @@
         let audioStarted = false;
 
         let globalReverb;
-        let compressor;
 
         function setup() {
             createCanvas(windowWidth, windowHeight);
@@ -38,17 +37,6 @@
             // Configurar reverb global
             globalReverb = new p5.Reverb();
             globalReverb.set(6, 3); // Tiempo de reverberación largo y decay lento
-
-            // Configurar compresor
-            compressor = new p5.Compressor();
-            compressor.threshold(-12);
-            compressor.ratio(2);
-            compressor.attack(0.1);
-            compressor.release(0.2);
-
-            // Conectar el compresor a la reverb global
-            globalReverb.connect(compressor);
-            compressor.connect();
 
             for (let i = 0; i < 500; i++) {
                 particles[i] = new Particle();
@@ -103,7 +91,7 @@
                 // Crear un oscilador con una frecuencia aleatoria
                 this.oscillator = new p5.Oscillator('sine');
                 this.oscillator.freq(random(100, 2200));
-                this.oscillator.amp(0, 0);  // Comienza en silencio
+                this.oscillator.amp(0);  // Comienza en silencio
 
                 // Conectar oscilador a la reverb global
                 this.oscillator.disconnect();
@@ -112,6 +100,7 @@
                 this.shouldPlaySound = random(1) < 0.2;  // 20% de probabilidad de que tenga sonido activo
                 this.soundDuration = 10000;  // Duración del sonido en milisegundos
                 this.startTime = millis();  // Momento en que comienza el sonido
+                this.oscillator.start();  // Comenzar el oscilador
             }
 
             follow(vectors) {
@@ -135,7 +124,6 @@
                 // Controlar el sonido en función del tiempo
                 let currentTime = millis();
                 if (this.shouldPlaySound && currentTime - this.startTime <= this.soundDuration) {
-                    this.oscillator.start();
                     let elapsed = currentTime - this.startTime;
                     if (elapsed < 500) {
                         // Fade in al inicio
@@ -170,5 +158,6 @@
     </script>
 </body>
 </html>
+
 
 
