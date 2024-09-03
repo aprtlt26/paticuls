@@ -26,7 +26,7 @@
         let maxSpeed = 2;
         let audioStarted = false;
 
-        let reverb;
+        let globalReverb;
         let compressor;
 
         function setup() {
@@ -35,15 +35,20 @@
             rows = floor(height / scl);
             flowfield = new Array(cols * rows);
 
-            // Configurar reverb y compresor
-            reverb = new p5.Reverb();
+            // Configurar reverb global
+            globalReverb = new p5.Reverb();
+            globalReverb.set(6, 3); // Tiempo de reverberación largo y decay lento
+
+            // Configurar compresor
             compressor = new p5.Compressor();
-            reverb.drywet(0.5); // Mezcla de 50% entre sonido directo y reverberado
-            reverb.set(3, 2); // Tiempo de reverberación y desvanecimiento
             compressor.threshold(-12);
             compressor.ratio(2);
             compressor.attack(0.1);
             compressor.release(0.2);
+
+            // Conectar el compresor a la reverb global
+            globalReverb.connect(compressor);
+            compressor.connect();
 
             for (let i = 0; i < 500; i++) {
                 particles[i] = new Particle();
@@ -98,14 +103,15 @@
                 // Crear un oscilador con una frecuencia aleatoria
                 this.oscillator = new p5.Oscillator('sine');
                 this.oscillator.freq(random(100, 2200));
-                this.oscillator.amp(0.5);
-                
-                // Conectar oscilador a reverb y compresor
+                this.oscillator.amp(0, 0);  // Comienza en silencio
+
+                // Conectar oscilador a la reverb global
                 this.oscillator.disconnect();
-                this.oscillator.connect(reverb);
-                reverb.connect(compressor);
+                this.oscillator.connect(globalReverb);
 
                 this.shouldPlaySound = random(1) < 0.2;  // 20% de probabilidad de que tenga sonido activo
+                this.soundDuration = 10000;  // Duración del sonido en milisegundos
+                this.startTime = millis();  // Momento en que comienza el sonido
             }
 
             follow(vectors) {
@@ -126,13 +132,21 @@
                 this.pos.add(this.vel);
                 this.acc.mult(0);
 
-                if (this.shouldPlaySound && this.vel.mag() > 0.1) {
+                // Controlar el sonido en función del tiempo
+                let currentTime = millis();
+                if (this.shouldPlaySound && currentTime - this.startTime <= this.soundDuration) {
                     this.oscillator.start();
-                    this.oscillator.amp(0.5, 0.05);
-                    setTimeout(() => {
-                        this.oscillator.amp(0, 0.05);
-                        this.oscillator.stop();
-                    }, 10000); // Oscilador activo por 10 segundos
+                    let elapsed = currentTime - this.startTime;
+                    if (elapsed < 500) {
+                        // Fade in al inicio
+                        this.oscillator.amp(0.5, 0.5);
+                    } else if (elapsed > this.soundDuration - 1000) {
+                        // Fade out al final
+                        this.oscillator.amp(0, 1);
+                        setTimeout(() => this.oscillator.stop(), 1000); // Apagar el oscilador después del fade out
+                    }
+                } else if (currentTime - this.startTime > this.soundDuration) {
+                    this.shouldPlaySound = false;  // Desactivar el sonido después de la duración
                 }
             }
 
