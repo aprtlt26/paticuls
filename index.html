@@ -34,9 +34,9 @@
             rows = floor(height / scl);
             flowfield = new Array(cols * rows);
 
-            // Configurar reverb global
+            // Configurar reverb global con mayor amplitud
             globalReverb = new p5.Reverb();
-            globalReverb.set(6, 3); // Tiempo de reverberación largo y decay lento
+            globalReverb.set(12, 16); // Reverb más larga y envolvente
 
             for (let i = 0; i < 500; i++) {
                 particles[i] = new Particle();
@@ -80,6 +80,28 @@
             }
         }
 
+        function mouseMoved() {
+            modulateInteraction();
+        }
+
+        function touchMoved() {
+            modulateInteraction();
+        }
+
+        function modulateInteraction() {
+            // Modula la velocidad de las partículas y la frecuencia de los osciladores basados en la posición del mouse
+            let speedFactor = map(mouseX, 0, width, 0.5, 4); // Aumenta o disminuye la velocidad de las partículas
+            let frequencyFactor = map(mouseY, 0, height, 0.5, 2); // Modula la frecuencia
+
+            maxSpeed = speedFactor;
+
+            for (let i = 0; i < particles.length; i++) {
+                if (particles[i].shouldPlaySound) {
+                    particles[i].oscillator.freq(particles[i].baseFreq * frequencyFactor);
+                }
+            }
+        }
+
         class Particle {
             constructor() {
                 this.pos = createVector(random(width), random(height));
@@ -89,8 +111,9 @@
                 this.prevPos = this.pos.copy();
 
                 // Crear un oscilador con una frecuencia aleatoria
+                this.baseFreq = random(100, 2200); // Frecuencia base que será modulada
                 this.oscillator = new p5.Oscillator('sine');
-                this.oscillator.freq(random(100, 2200));
+                this.oscillator.freq(this.baseFreq);
                 this.oscillator.amp(0);  // Comienza en silencio
 
                 // Conectar oscilador a la reverb global
@@ -116,7 +139,7 @@
 
             update() {
                 this.vel.add(this.acc);
-                this.vel.limit(this.maxSpeed);
+                this.vel.limit(maxSpeed);  // Utiliza maxSpeed modulado
                 this.pos.add(this.vel);
                 this.acc.mult(0);
 
