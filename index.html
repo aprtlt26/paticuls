@@ -36,7 +36,7 @@
 
             // Configurar reverb global con mayor amplitud
             globalReverb = new p5.Reverb();
-            globalReverb.set(12, 16); // Reverb más larga y envolvente
+            globalReverb.set(12, 6); // Reverb más larga y envolvente
 
             for (let i = 0; i < 500; i++) {
                 particles[i] = new Particle();
@@ -81,17 +81,18 @@
         }
 
         function mouseMoved() {
-            modulateInteraction();
+            modulateInteraction(mouseX, mouseY);
         }
 
         function touchMoved() {
-            modulateInteraction();
+            modulateInteraction(touchX, touchY);
+            return false;  // Prevenir el comportamiento por defecto de desplazamiento en dispositivos táctiles
         }
 
-        function modulateInteraction() {
+        function modulateInteraction(x, y) {
             // Modula la velocidad de las partículas y la frecuencia de los osciladores basados en la posición del mouse
-            let speedFactor = map(mouseX, 0, width, 0.5, 4); // Aumenta o disminuye la velocidad de las partículas
-            let frequencyFactor = map(mouseY, 0, height, 0.5, 2); // Modula la frecuencia
+            let speedFactor = map(x, 0, width, 0.5, 4); // Aumenta o disminuye la velocidad de las partículas
+            let frequencyFactor = map(y, 0, height, 0.5, 2); // Modula la frecuencia
 
             maxSpeed = speedFactor;
 
