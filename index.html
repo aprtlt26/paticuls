@@ -3,17 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Fluid Particle System with Depth</title>
+    <title>Interactive Fluid Particle System</title>
     <style>
         body, html {
             margin: 0;
             padding: 0;
             overflow: hidden;
             background: black;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        #start-button {
+            position: absolute;
+            background-color: #ffffff;
+            color: #000000;
+            padding: 10px 20px;
+            font-size: 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            z-index: 10;
         }
     </style>
 </head>
 <body>
+    <button id="start-button">Iniciar</button>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/addons/p5.sound.min.js"></script>
     <script>
@@ -27,6 +43,7 @@
         let audioStarted = false;
 
         let globalReverb;
+        let isInteracting = false;
 
         function setup() {
             createCanvas(windowWidth, windowHeight);
@@ -38,11 +55,12 @@
             globalReverb = new p5.Reverb();
             globalReverb.set(12, 6); // Reverb más larga y envolvente
 
-            for (let i = 0; i < 500; i++) {
+            for (let i = 0; i < 300; i++) { // Reducido a 300 partículas para rendimiento en móviles
                 particles[i] = new Particle();
             }
 
             background(0);
+            noLoop();  // Evitar que el draw se ejecute hasta que el usuario interactúe
         }
 
         function draw() {
@@ -54,13 +72,16 @@
                 for (let x = 0; x < cols; x++) {
                     let index = x + y * cols;
                     let angle = noise(xoff, yoff, zoff) * TWO_PI;
-
-                    // Modificar la dirección del flujo para que apunte al mouse
-                    let mouseVector = createVector(mouseX - x * scl, mouseY - y * scl);
-                    angle = mouseVector.heading();
-
                     let v = p5.Vector.fromAngle(angle);
                     v.setMag(0.5);
+
+                    // Si está interactuando, modificar la dirección hacia el mouse/touch
+                    if (isInteracting) {
+                        let mouseVector = createVector(mouseX - x * scl, mouseY - y * scl);
+                        angle = mouseVector.heading();
+                        v = p5.Vector.fromAngle(angle);
+                    }
+
                     flowfield[index] = v;
                     xoff += inc;
                 }
@@ -76,19 +97,22 @@
             zoff += 0.003;
         }
 
-        function mousePressed() {
+        function startInteraction() {
             if (!audioStarted) {
                 userStartAudio();  // Iniciar el contexto de audio
                 audioStarted = true;
                 loop();  // Comenzar el bucle de draw
+                document.getElementById('start-button').style.display = 'none';  // Ocultar el botón de inicio
             }
         }
 
         function mouseMoved() {
+            isInteracting = true;
             modulateInteraction(mouseX, mouseY);
         }
 
         function touchMoved() {
+            isInteracting = true;
             modulateInteraction(touchX, touchY);
             return false;  // Prevenir el comportamiento por defecto de desplazamiento en dispositivos táctiles
         }
@@ -164,12 +188,8 @@
             }
 
             show() {
-                // Añadir cromatismo y brillo
-                stroke(255, 204, 255, 150); // Partículas con un tono ligeramente púrpura y semitransparente
-                strokeWeight(2);
-                let colorFactor = map(this.vel.mag(), 0, maxSpeed, 50, 255);
-                stroke(colorFactor, colorFactor, 255, 200);
-
+                stroke(255, 100);
+                strokeWeight(1);
                 line(this.pos.x, this.pos.y, this.prevPos.x, this.prevPos.y);
                 this.prevPos = this.pos.copy();
             }
@@ -183,7 +203,7 @@
             }
         }
 
-        noLoop();  // Evitar que el draw se ejecute hasta que el usuario interactúe
+        document.getElementById('start-button').addEventListener('click', startInteraction);
     </script>
 </body>
 </html>
