@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fluid Particle System with White Noise</title>
+    <title>Fluid Particle System with Sound</title>
     <style>
         body, html {
             margin: 0;
@@ -24,9 +24,7 @@
         let particles = [];
         let flowfield;
         let maxSpeed = 2;
-
-        // Variables para sonido
-        let noiseOsc, filter, lfo, noiseGain;
+        let audioStarted = false;
 
         function setup() {
             createCanvas(windowWidth, windowHeight);
@@ -39,32 +37,11 @@
             }
 
             background(0);
-
-            // Configurar ruido blanco y filtro
-            noiseOsc = new p5.Noise('white');
-            noiseOsc.start();
-
-            filter = new p5.LowPass();
-            filter.freq(500); // Filtrar a 500 Hz
-            filter.res(0.7);
-            noiseOsc.disconnect();
-            noiseOsc.connect(filter);
-
-            noiseGain = new p5.Gain();
-            filter.connect(noiseGain);
-            noiseGain.amp(0.1);
-            noiseGain.connect();
-
-            // LFO de pulsación aleatoria
-            lfo = new p5.Oscillator('sine');
-            lfo.freq(random(0.05, 0.2)); // Pulsación lenta y aleatoria
-            lfo.amp(0.05, 0.1); // Amplitud de la modulación
-            lfo.start();
-            lfo.disconnect();
-            lfo.connect(noiseGain.amp());
         }
 
         function draw() {
+            if (!audioStarted) return;  // No dibujar ni activar sonidos hasta que el audio esté habilitado
+
             let yoff = 0;
             for (let y = 0; y < rows; y++) {
                 let xoff = 0;
@@ -89,6 +66,14 @@
             zoff += 0.003;
         }
 
+        function mousePressed() {
+            if (!audioStarted) {
+                userStartAudio();  // Iniciar el contexto de audio
+                audioStarted = true;
+                loop();  // Comenzar el bucle de draw
+            }
+        }
+
         class Particle {
             constructor() {
                 this.pos = createVector(random(width), random(height));
@@ -96,6 +81,16 @@
                 this.acc = createVector(0, 0);
                 this.maxSpeed = maxSpeed;
                 this.prevPos = this.pos.copy();
+
+                // Crear un oscilador con una frecuencia aleatoria
+                this.oscillator = new p5.Oscillator('sine');
+                this.oscillator.freq(random(100, 2200));
+                this.oscillator.amp(0.5);
+                this.oscillator.start();
+                this.oscillator.stop();  // Iniciar parado
+                
+                // Controlar cuándo debe sonar
+                this.shouldPlaySound = random(1) < 0.2;  // 20% de probabilidad de que tenga sonido activo
             }
 
             follow(vectors) {
@@ -115,6 +110,15 @@
                 this.vel.limit(this.maxSpeed);
                 this.pos.add(this.vel);
                 this.acc.mult(0);
+
+                if (this.shouldPlaySound && this.vel.mag() > 0.1) {
+                    this.oscillator.start();
+                    this.oscillator.amp(0.5, 0.05);
+                    setTimeout(() => {
+                        this.oscillator.amp(0, 0.05);
+                        this.oscillator.stop();
+                    }, 10000);
+                }
             }
 
             show() {
@@ -132,6 +136,9 @@
                 this.prevPos = this.pos.copy();
             }
         }
+
+        noLoop();  // Evitar que el draw se ejecute hasta que el usuario interactúe
     </script>
 </body>
 </html>
+
