@@ -3,13 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Fluid Particle System</title>
+    <title>Interactive Fluid Particle System</title>
     <style>
         body, html {
             margin: 0;
             padding: 0;
             overflow: hidden;
             background: black;
+            height: 100%;
+            width: 100%;
+        }
+        #start-button {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #ffffff;
+            color: #000000;
+            padding: 10px 20px;
+            font-size: 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            z-index: 10;
         }
         canvas {
             display: block;
@@ -17,45 +33,47 @@
     </style>
 </head>
 <body>
+    <button id="start-button">Iniciar</button>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/addons/p5.sound.min.js"></script>
     <script>
-        let inc = 0.02;
+        let inc = 0.1;
         let scl = 20;
         let cols, rows;
         let zoff = 0;
         let particles = [];
         let flowfield;
-        let maxSpeed = 0.5;
+        let maxSpeed = 2;
         let audioStarted = false;
         let globalReverb;
+        let isInteracting = false;
 
         function setup() {
-            // Crear el canvas con respecto a la pantalla, para móviles y desktop
             let canvas = createCanvas(windowWidth, windowHeight);
             canvas.parent(document.body);
-
-            pixelDensity(displayDensity()); // Ajustar la densidad de píxeles para dispositivos retina
-
+            pixelDensity(1);  // Para pantallas móviles
             cols = floor(width / scl);
             rows = floor(height / scl);
             flowfield = new Array(cols * rows);
 
+            // Configurar reverb global
             globalReverb = new p5.Reverb();
             globalReverb.set(12, 6);  // Reverb larga y envolvente
 
-            // Crear las partículas
-            for (let i = 0; i < 250; i++) {
+            for (let i = 0; i < 300; i++) { // Reducido a 300 partículas para rendimiento en móviles
                 particles[i] = new Particle();
             }
 
-            background(0); // Fondo completamente negro
+            background(0);
+            noLoop();  // Evitar que el draw se ejecute hasta que el usuario interactúe
         }
 
         function draw() {
             if (!audioStarted) return;
 
-            background(0, 10); // Fondo negro con transparencia
+            // Fondo semi-transparente para mantener los rastros visibles
+            fill(0, 10);
+            rect(0, 0, width, height);
 
             let yoff = 0;
             for (let y = 0; y < rows; y++) {
@@ -64,7 +82,14 @@
                     let index = x + y * cols;
                     let angle = noise(xoff, yoff, zoff) * TWO_PI;
                     let v = p5.Vector.fromAngle(angle);
-                    v.setMag(0.1);  // Movimiento más suave
+                    v.setMag(1); // Partículas más visibles
+
+                    if (isInteracting) {
+                        let mouseVector = createVector(mouseX - x * scl, mouseY - y * scl);
+                        angle = mouseVector.heading();
+                        v = p5.Vector.fromAngle(angle);
+                    }
+
                     flowfield[index] = v;
                     xoff += inc;
                 }
@@ -77,27 +102,42 @@
                 particles[i].edges();
                 particles[i].show();
             }
-
-            zoff += 0.001;  // Movimiento suave del campo de flujo
+            zoff += 0.003;
         }
 
-        function touchStarted() {
-            startAudio();
-            return false;  // Prevenir desplazamiento en pantallas móviles
-        }
-
-        function mousePressed() {
-            startAudio();
-        }
-
-        function startAudio() {
+        function startInteraction() {
             if (!audioStarted) {
                 userStartAudio().then(() => {
                     audioStarted = true;
-                    loop();  // Comenzar el bucle de dibujo
+                    loop();  // Iniciar el bucle de dibujo
+                    document.getElementById('start-button').style.display = 'none';  // Ocultar el botón de inicio
                 }).catch((err) => {
                     console.log('Error al iniciar el audio: ', err);
                 });
+            }
+        }
+
+        function mouseMoved() {
+            isInteracting = true;
+            modulateInteraction(mouseX, mouseY);
+        }
+
+        function touchMoved() {
+            isInteracting = true;
+            modulateInteraction(touchX, touchY);
+            return false;  // Prevenir desplazamiento en móviles
+        }
+
+        function modulateInteraction(x, y) {
+            let speedFactor = map(x, 0, width, 0.5, 4);  // Modificar velocidad de las partículas
+            let frequencyFactor = map(y, 0, height, 0.5, 2);  // Modificar frecuencia de osciladores
+
+            maxSpeed = speedFactor;
+
+            for (let i = 0; i < particles.length; i++) {
+                if (particles[i].shouldPlaySound) {
+                    particles[i].oscillator.freq(particles[i].baseFreq * frequencyFactor);
+                }
             }
         }
 
@@ -109,21 +149,17 @@
                 this.maxSpeed = maxSpeed;
                 this.prevPos = this.pos.copy();
 
-                this.baseFreq = random(50, 3000);  // Ampliación del rango de frecuencia
+                this.baseFreq = random(100, 2200);  // Frecuencia base modulada
                 this.oscillator = new p5.Oscillator('sine');
                 this.oscillator.freq(this.baseFreq);
-                this.oscillator.amp(0);  // Comienza en silencio
+                this.oscillator.amp(0);  // Iniciar en silencio
 
                 this.oscillator.disconnect();
                 this.oscillator.connect(globalReverb);
 
-                this.shouldPlaySound = random(1) < 0.15;  // Sonido ocasional
-                this.soundDuration = random(5000, 15000);  // Duración variable del sonido
-                this.nextSoundTime = millis() + random(3000, 10000);  // Tiempo hasta que suene nuevamente
-
-                this.isTurquoise = random(1) < 0.3;
-                this.isBrightWhite = random(1) < 0.3;
-                this.isSoftWhite = random(1) < 0.3;
+                this.shouldPlaySound = random(1) < 0.2;  // 20% de probabilidad de sonido
+                this.soundDuration = 10000;
+                this.nextSoundTime = millis() + random(3000, 8000);
             }
 
             follow(vectors) {
@@ -140,38 +176,27 @@
 
             update() {
                 this.vel.add(this.acc);
-                this.vel.limit(this.maxSpeed);
+                this.vel.limit(maxSpeed);  // Usar maxSpeed modificado
                 this.pos.add(this.vel);
                 this.acc.mult(0);
 
                 let currentTime = millis();
                 if (this.shouldPlaySound && currentTime >= this.nextSoundTime) {
                     this.oscillator.start();
-                    this.oscillator.amp(random(0.01, 0.03), 0.5);  // Volumen reducido
+                    this.oscillator.amp(0.1, 0.5);  // Volumen reducido
                     setTimeout(() => {
                         this.oscillator.amp(0, 1);  // Fade out
-                        setTimeout(() => this.oscillator.stop(), 1000);
+                        setTimeout(() => this.oscillator.stop(), 1000);  // Detener oscilador
                     }, this.soundDuration - 1000);
 
-                    this.nextSoundTime = currentTime + random(3000, 10000);
+                    this.nextSoundTime = currentTime + random(3000, 8000);
                 }
             }
 
             show() {
-                let brightness = map(this.vel.mag(), 0, maxSpeed, 100, 255);
-
-                if (this.isBrightWhite) {
-                    stroke(255, 255, 255, 255);
-                } else if (this.isSoftWhite) {
-                    stroke(255, 255, 255, 220);
-                } else if (this.isTurquoise) {
-                    stroke(64, 224, 208, brightness);
-                } else {
-                    stroke(brightness, brightness, brightness, 250);
-                }
-
-                strokeWeight(0.6);
-                line(this.pos.x, this.pos.y, this.prevPos.x, this.prevPos.y);
+                stroke(255, 100);  // Blanco con opacidad
+                strokeWeight(1);
+                line(this.pos.x, this.pos.y, this.prevPos.x, this.prevPos.y);  // Línea entre la posición actual y la anterior
                 this.prevPos = this.pos.copy();
             }
 
@@ -184,11 +209,11 @@
             }
         }
 
+        document.getElementById('start-button').addEventListener('click', startInteraction);
+        
         function windowResized() {
-            resizeCanvas(windowWidth, windowHeight);  // Ajustar el canvas en móviles
+            resizeCanvas(windowWidth, windowHeight);  // Redimensionar el canvas en móviles
         }
-
-        noLoop();  // Evitar que el draw se ejecute hasta que el usuario interactúe
     </script>
 </body>
 </html>
