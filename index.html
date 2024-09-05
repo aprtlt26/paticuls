@@ -2,78 +2,69 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Interactive Fluid Particle System</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fluid Particle System with Enhanced Green Noise and New Aesthetics</title>
     <style>
         body, html {
             margin: 0;
             padding: 0;
             overflow: hidden;
             background: black;
-            height: 100%;
-            width: 100%;
-        }
-        #start-button {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background-color: #ffffff;
-            color: #000000;
-            padding: 10px 20px;
-            font-size: 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            z-index: 10;
-        }
-        canvas {
-            display: block;
         }
     </style>
 </head>
 <body>
-    <button id="start-button">Iniciar</button>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/addons/p5.sound.min.js"></script>
     <script>
-        let inc = 0.1;
-        let scl = 20;
+        let inc = 0.05;
+        let scl = 10;
         let cols, rows;
         let zoff = 0;
         let particles = [];
         let flowfield;
-        let maxSpeed = 2;
+        let maxSpeed = 0.3;
         let audioStarted = false;
-        let globalReverb;
-        let isInteracting = false;
+        let globalReverb, noiseOscillator, lfo;
+
+        let erasePoint;
+        let touchPoints = [];
 
         function setup() {
-            let canvas = createCanvas(windowWidth, windowHeight);
-            canvas.parent(document.body);
-            pixelDensity(1);  // Para pantallas móviles
+            createCanvas(windowWidth, windowHeight);
             cols = floor(width / scl);
             rows = floor(height / scl);
             flowfield = new Array(cols * rows);
 
-            // Configurar reverb global
             globalReverb = new p5.Reverb();
-            globalReverb.set(12, 6);  // Reverb larga y envolvente
+            globalReverb.set(12, 8); 
 
-            for (let i = 0; i < 300; i++) { // Reducido a 300 partículas para rendimiento en móviles
+            // Configurar ruido verde más fuerte
+            noiseOscillator = new p5.Noise('pink');
+            let lowPassFilter = new p5.LowPass();
+            lowPassFilter.freq(500); 
+            noiseOscillator.disconnect();
+            noiseOscillator.connect(lowPassFilter);
+
+            noiseOscillator.amp(0.5, 1);  // Aumentar la amplitud inicial del ruido verde
+
+            lfo = new p5.Oscillator('sine');
+            lfo.freq(random(1 / 7, 1 / 5)); 
+            lfo.disconnect();  
+            lfo.amp(0.8);  // Aumentar la amplitud del LFO para hacer el ruido verde mucho más notable
+            lfo.start();
+
+            for (let i = 0; i < 500; i++) {
                 particles[i] = new Particle();
             }
 
             background(0);
-            noLoop();  // Evitar que el draw se ejecute hasta que el usuario interactúe
         }
 
         function draw() {
             if (!audioStarted) return;
 
-            // Fondo semi-transparente para mantener los rastros visibles
-            fill(0, 10);
-            rect(0, 0, width, height);
+            background(0, 20); // Fondo más opaco para mayor permanencia de las partículas
 
             let yoff = 0;
             for (let y = 0; y < rows; y++) {
@@ -82,14 +73,7 @@
                     let index = x + y * cols;
                     let angle = noise(xoff, yoff, zoff) * TWO_PI;
                     let v = p5.Vector.fromAngle(angle);
-                    v.setMag(1); // Partículas más visibles
-
-                    if (isInteracting) {
-                        let mouseVector = createVector(mouseX - x * scl, mouseY - y * scl);
-                        angle = mouseVector.heading();
-                        v = p5.Vector.fromAngle(angle);
-                    }
-
+                    v.setMag(0.5);
                     flowfield[index] = v;
                     xoff += inc;
                 }
@@ -102,43 +86,44 @@
                 particles[i].edges();
                 particles[i].show();
             }
-            zoff += 0.003;
-        }
 
-        function startInteraction() {
-            if (!audioStarted) {
-                userStartAudio().then(() => {
-                    audioStarted = true;
-                    loop();  // Iniciar el bucle de dibujo
-                    document.getElementById('start-button').style.display = 'none';  // Ocultar el botón de inicio
-                }).catch((err) => {
-                    console.log('Error al iniciar el audio: ', err);
-                });
+            // Dibujar el punto de luz al tocar
+            for (let i = touchPoints.length - 1; i >= 0; i--) {
+                let t = touchPoints[i];
+                t.display();
+                t.fade();
+                if (t.opacity <= 0) {
+                    touchPoints.splice(i, 1); // Eliminar si se desvanece completamente
+                }
             }
+
+            zoff += 0.003;
+
+            let noiseAmplitude = map(lfo.getAmp(), -1, 1, 0.3, 0.7);  // Aumentar el rango de amplitud
+            noiseOscillator.amp(noiseAmplitude, 0.6);  // Aplicar la amplitud al ruido verde
         }
 
-        function mouseMoved() {
-            isInteracting = true;
-            modulateInteraction(mouseX, mouseY);
+        function mousePressed() {
+            if (!audioStarted) {
+                userStartAudio();  
+                audioStarted = true;
+                loop();  
+            }
+
+            addTouchPoint(mouseX, mouseY); // Agregar el punto de luz en la posición del mouse
         }
 
         function touchMoved() {
-            isInteracting = true;
-            modulateInteraction(touchX, touchY);
-            return false;  // Prevenir desplazamiento en móviles
+            addTouchPoint(touchX, touchY); // Agregar el punto de luz al mover el touch
         }
 
-        function modulateInteraction(x, y) {
-            let speedFactor = map(x, 0, width, 0.5, 4);  // Modificar velocidad de las partículas
-            let frequencyFactor = map(y, 0, height, 0.5, 2);  // Modificar frecuencia de osciladores
+        function addTouchPoint(x, y) {
+            let t = new TouchPoint(x, y);
+            touchPoints.push(t);
+        }
 
-            maxSpeed = speedFactor;
-
-            for (let i = 0; i < particles.length; i++) {
-                if (particles[i].shouldPlaySound) {
-                    particles[i].oscillator.freq(particles[i].baseFreq * frequencyFactor);
-                }
-            }
+        function touchEnded() {
+            erasePoint = null; 
         }
 
         class Particle {
@@ -149,17 +134,17 @@
                 this.maxSpeed = maxSpeed;
                 this.prevPos = this.pos.copy();
 
-                this.baseFreq = random(100, 2200);  // Frecuencia base modulada
+                this.baseFreq = random(100, 7000);  
                 this.oscillator = new p5.Oscillator('sine');
                 this.oscillator.freq(this.baseFreq);
-                this.oscillator.amp(0);  // Iniciar en silencio
+                this.oscillator.amp(0);
 
                 this.oscillator.disconnect();
                 this.oscillator.connect(globalReverb);
 
-                this.shouldPlaySound = random(1) < 0.2;  // 20% de probabilidad de sonido
-                this.soundDuration = 10000;
-                this.nextSoundTime = millis() + random(3000, 8000);
+                this.shouldPlaySound = random(1) < 0.10;  
+                this.soundDuration = random(5000, 10000);  
+                this.nextSoundTime = millis() + random(3000, 10000);  
             }
 
             follow(vectors) {
@@ -176,27 +161,28 @@
 
             update() {
                 this.vel.add(this.acc);
-                this.vel.limit(maxSpeed);  // Usar maxSpeed modificado
+                this.vel.limit(this.maxSpeed);
                 this.pos.add(this.vel);
                 this.acc.mult(0);
 
                 let currentTime = millis();
                 if (this.shouldPlaySound && currentTime >= this.nextSoundTime) {
                     this.oscillator.start();
-                    this.oscillator.amp(0.1, 0.5);  // Volumen reducido
+                    this.oscillator.amp(random(0.01, 0.02), 0.2);  // Reducir el volumen de los osciladores aún más
                     setTimeout(() => {
-                        this.oscillator.amp(0, 1);  // Fade out
-                        setTimeout(() => this.oscillator.stop(), 1000);  // Detener oscilador
+                        this.oscillator.amp(0.01, 0.2);  
+                        setTimeout(() => this.oscillator.stop(), 1000);  
                     }, this.soundDuration - 1000);
 
-                    this.nextSoundTime = currentTime + random(3000, 8000);
+                    this.nextSoundTime = currentTime + random(3000, 10000);  
                 }
             }
 
             show() {
-                stroke(255, 100);  // Blanco con opacidad
-                strokeWeight(1);
-                line(this.pos.x, this.pos.y, this.prevPos.x, this.prevPos.y);  // Línea entre la posición actual y la anterior
+                stroke(255, 200, 0, 50);  // Colores más vibrantes y cálidos
+                strokeWeight(1.5);
+
+                line(this.pos.x, this.pos.y, this.prevPos.x, this.prevPos.y);
                 this.prevPos = this.pos.copy();
             }
 
@@ -209,14 +195,29 @@
             }
         }
 
-        document.getElementById('start-button').addEventListener('click', startInteraction);
-        
-        function windowResized() {
-            resizeCanvas(windowWidth, windowHeight);  // Redimensionar el canvas en móviles
+        class TouchPoint {
+            constructor(x, y) {
+                this.pos = createVector(x, y);
+                this.size = 20;
+                this.opacity = 255;
+            }
+
+            display() {
+                noStroke();
+                fill(255, this.opacity);  // Luz blanca
+                ellipse(this.pos.x, this.pos.y, this.size);
+            }
+
+            fade() {
+                this.opacity -= 4; // Se desvanece lentamente
+            }
         }
+
+        noLoop();  
     </script>
 </body>
 </html>
+
 
 
 
