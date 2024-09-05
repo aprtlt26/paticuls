@@ -10,10 +10,8 @@
             padding: 0;
             overflow: hidden;
             background: black;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
+            height: 100%;
+            width: 100%;
         }
         #start-button {
             position: absolute;
@@ -50,15 +48,16 @@
         function setup() {
             let canvas = createCanvas(windowWidth, windowHeight);
             canvas.parent(document.body);
-            pixelDensity(1);  // Asegurar correcta visualización en móviles
+            pixelDensity(1);  // Para pantallas móviles
             cols = floor(width / scl);
             rows = floor(height / scl);
             flowfield = new Array(cols * rows);
 
+            // Configurar reverb global
             globalReverb = new p5.Reverb();
-            globalReverb.set(12, 6); // Reverb larga y envolvente
+            globalReverb.set(12, 6);  // Reverb larga y envolvente
 
-            for (let i = 0; i < 300; i++) { // Número de partículas ajustado para mejor rendimiento
+            for (let i = 0; i < 300; i++) { // Reducido a 300 partículas para rendimiento en móviles
                 particles[i] = new Particle();
             }
 
@@ -70,7 +69,7 @@
             if (!audioStarted) return;
 
             // Fondo semi-transparente para mantener los rastros visibles
-            fill(0, 5);
+            fill(0, 10);
             rect(0, 0, width, height);
 
             let yoff = 0;
@@ -80,7 +79,7 @@
                     let index = x + y * cols;
                     let angle = noise(xoff, yoff, zoff) * TWO_PI;
                     let v = p5.Vector.fromAngle(angle);
-                    v.setMag(1); // Ajuste para que las partículas sean más visibles
+                    v.setMag(1); // Partículas más visibles
 
                     if (isInteracting) {
                         let mouseVector = createVector(mouseX - x * scl, mouseY - y * scl);
@@ -181,7 +180,7 @@
                 let currentTime = millis();
                 if (this.shouldPlaySound && currentTime >= this.nextSoundTime) {
                     this.oscillator.start();
-                    this.oscillator.amp(0.3, 0.5);  // Fade in ajustado
+                    this.oscillator.amp(0.1, 0.5);  // Volumen reducido
                     setTimeout(() => {
                         this.oscillator.amp(0, 1);  // Fade out
                         setTimeout(() => this.oscillator.stop(), 1000);  // Detener oscilador
