@@ -37,43 +37,39 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/addons/p5.sound.min.js"></script>
     <script>
         let inc = 0.1;
-        let scl = 20; // Tamaño de la cuadrícula
+        let scl = 20;
         let cols, rows;
         let zoff = 0;
         let particles = [];
         let flowfield;
         let maxSpeed = 2;
         let audioStarted = false;
-
         let globalReverb;
         let isInteracting = false;
 
         function setup() {
             let canvas = createCanvas(windowWidth, windowHeight);
             canvas.parent(document.body);
-
-            pixelDensity(1);  // Ajustar la densidad de píxeles para móviles
-
+            pixelDensity(1);  // Asegurar correcta visualización en móviles
             cols = floor(width / scl);
             rows = floor(height / scl);
             flowfield = new Array(cols * rows);
 
             globalReverb = new p5.Reverb();
-            globalReverb.set(12, 6);  // Reverb larga y envolvente
+            globalReverb.set(12, 6); // Reverb larga y envolvente
 
-            for (let i = 0; i < 300; i++) {
+            for (let i = 0; i < 300; i++) { // Número de partículas ajustado para mejor rendimiento
                 particles[i] = new Particle();
             }
 
-            background(0); // Fondo negro para que las partículas se vean bien
+            background(0);
             noLoop();  // Evitar que el draw se ejecute hasta que el usuario interactúe
         }
 
         function draw() {
             if (!audioStarted) return;
 
-            // No borramos el fondo para dejar rastros permanentes
-            // Aumenta ligeramente la opacidad del fondo, permitiendo que los rastros se queden
+            // Fondo semi-transparente para mantener los rastros visibles
             fill(0, 5);
             rect(0, 0, width, height);
 
@@ -84,7 +80,7 @@
                     let index = x + y * cols;
                     let angle = noise(xoff, yoff, zoff) * TWO_PI;
                     let v = p5.Vector.fromAngle(angle);
-                    v.setMag(1);  // Velocidad ajustada para fluidez
+                    v.setMag(1); // Ajuste para que las partículas sean más visibles
 
                     if (isInteracting) {
                         let mouseVector = createVector(mouseX - x * scl, mouseY - y * scl);
@@ -112,7 +108,7 @@
                 userStartAudio().then(() => {
                     audioStarted = true;
                     loop();  // Iniciar el bucle de dibujo
-                    document.getElementById('start-button').style.display = 'none';  // Ocultar botón
+                    document.getElementById('start-button').style.display = 'none';  // Ocultar el botón de inicio
                 }).catch((err) => {
                     console.log('Error al iniciar el audio: ', err);
                 });
@@ -185,7 +181,7 @@
                 let currentTime = millis();
                 if (this.shouldPlaySound && currentTime >= this.nextSoundTime) {
                     this.oscillator.start();
-                    this.oscillator.amp(0.5, 0.5);  // Fade in
+                    this.oscillator.amp(0.3, 0.5);  // Fade in ajustado
                     setTimeout(() => {
                         this.oscillator.amp(0, 1);  // Fade out
                         setTimeout(() => this.oscillator.stop(), 1000);  // Detener oscilador
@@ -219,6 +215,7 @@
     </script>
 </body>
 </html>
+
 
 
 
