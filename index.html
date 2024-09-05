@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fluid Particle System with Enhanced Green Noise and New Aesthetics</title>
+    <title>Interactive Fluid Particle System with Sound</title>
     <style>
         body, html {
             margin: 0;
@@ -25,9 +25,7 @@
         let flowfield;
         let maxSpeed = 0.3;
         let audioStarted = false;
-        let globalReverb, noiseOscillator, lfo;
-
-        let erasePoint;
+        let globalReverb, noiseOscillator, lfo, lowPassFilter;
         let touchPoints = [];
 
         function setup() {
@@ -37,21 +35,19 @@
             flowfield = new Array(cols * rows);
 
             globalReverb = new p5.Reverb();
-            globalReverb.set(12, 8); 
+            globalReverb.set(12, 8);
 
-            // Configurar ruido verde más fuerte
-            noiseOscillator = new p5.Noise('pink');
-            let lowPassFilter = new p5.LowPass();
-            lowPassFilter.freq(500); 
+            // Configurar ruido blanco con filtro de paso bajo
+            noiseOscillator = new p5.Noise('white');
+            lowPassFilter = new p5.LowPass();
+            lowPassFilter.freq(500);  // Filtro de paso bajo a 500 Hz
             noiseOscillator.disconnect();
             noiseOscillator.connect(lowPassFilter);
-
-            noiseOscillator.amp(0.5, 1);  // Aumentar la amplitud inicial del ruido verde
+            noiseOscillator.amp(0);
 
             lfo = new p5.Oscillator('sine');
-            lfo.freq(random(1 / 7, 1 / 5)); 
-            lfo.disconnect();  
-            lfo.amp(0.8);  // Aumentar la amplitud del LFO para hacer el ruido verde mucho más notable
+            lfo.freq(random(1 / 6, 1 / 4));  // LFO entre 4 y 6 segundos
+            lfo.disconnect();
             lfo.start();
 
             for (let i = 0; i < 500; i++) {
@@ -64,7 +60,7 @@
         function draw() {
             if (!audioStarted) return;
 
-            background(0, 20); // Fondo más opaco para mayor permanencia de las partículas
+            background(0, 10);  // Fondo negro con transparencia
 
             let yoff = 0;
             for (let y = 0; y < rows; y++) {
@@ -93,37 +89,56 @@
                 t.display();
                 t.fade();
                 if (t.opacity <= 0) {
-                    touchPoints.splice(i, 1); // Eliminar si se desvanece completamente
+                    touchPoints.splice(i, 1);  // Eliminar si se desvanece completamente
                 }
             }
 
             zoff += 0.003;
 
-            let noiseAmplitude = map(lfo.getAmp(), -1, 1, 0.3, 0.7);  // Aumentar el rango de amplitud
-            noiseOscillator.amp(noiseAmplitude, 0.6);  // Aplicar la amplitud al ruido verde
+            // Modificar la amplitud del ruido blanco con LFO
+            let noiseAmplitude = map(lfo.getAmp(), -1, 1, 0.3, 0.7);  // Amplitud modulada del ruido
+            noiseOscillator.amp(noiseAmplitude, 0.5);  // Aplicar la amplitud modulada al ruido
         }
 
         function mousePressed() {
             if (!audioStarted) {
-                userStartAudio();  
+                userStartAudio();
                 audioStarted = true;
-                loop();  
+                loop();
             }
 
-            addTouchPoint(mouseX, mouseY); // Agregar el punto de luz en la posición del mouse
+            addTouchPoint(mouseX, mouseY);  // Agregar el punto de luz y activar un oscilador
         }
 
-        function touchMoved() {
-            addTouchPoint(touchX, touchY); // Agregar el punto de luz al mover el touch
+        function touchStarted() {
+            if (!audioStarted) {
+                userStartAudio();
+                audioStarted = true;
+                loop();
+            }
+
+            addTouchPoint(touchX, touchY);  // Agregar el punto de luz y activar un oscilador
         }
 
         function addTouchPoint(x, y) {
             let t = new TouchPoint(x, y);
             touchPoints.push(t);
-        }
 
-        function touchEnded() {
-            erasePoint = null; 
+            // Activar una nueva frecuencia cuando se toca la pantalla
+            let osc = new p5.Oscillator('sine');
+            osc.freq(random(200, 700));  // Frecuencia entre 200 y 700 Hz
+            osc.amp(0);
+            osc.start();
+            osc.disconnect();
+            osc.connect(globalReverb);  // Conectar a la reverb
+
+            osc.amp(0.5, 0.2);  // Fade in para la frecuencia
+            setTimeout(() => {
+                osc.amp(0, 2);  // Fade out suave después de 10 segundos
+                setTimeout(() => {
+                    osc.stop();  // Detener el oscilador
+                }, 2000);
+            }, 10000);
         }
 
         class Particle {
@@ -133,18 +148,6 @@
                 this.acc = createVector(0, 0);
                 this.maxSpeed = maxSpeed;
                 this.prevPos = this.pos.copy();
-
-                this.baseFreq = random(100, 7000);  
-                this.oscillator = new p5.Oscillator('sine');
-                this.oscillator.freq(this.baseFreq);
-                this.oscillator.amp(0);
-
-                this.oscillator.disconnect();
-                this.oscillator.connect(globalReverb);
-
-                this.shouldPlaySound = random(1) < 0.10;  
-                this.soundDuration = random(5000, 10000);  
-                this.nextSoundTime = millis() + random(3000, 10000);  
             }
 
             follow(vectors) {
@@ -164,22 +167,10 @@
                 this.vel.limit(this.maxSpeed);
                 this.pos.add(this.vel);
                 this.acc.mult(0);
-
-                let currentTime = millis();
-                if (this.shouldPlaySound && currentTime >= this.nextSoundTime) {
-                    this.oscillator.start();
-                    this.oscillator.amp(random(0.01, 0.02), 0.2);  // Reducir el volumen de los osciladores aún más
-                    setTimeout(() => {
-                        this.oscillator.amp(0.01, 0.2);  
-                        setTimeout(() => this.oscillator.stop(), 1000);  
-                    }, this.soundDuration - 1000);
-
-                    this.nextSoundTime = currentTime + random(3000, 10000);  
-                }
             }
 
             show() {
-                stroke(255, 200, 0, 50);  // Colores más vibrantes y cálidos
+                stroke(255, 200, 0, 50);  // Colores cálidos y vibrantes
                 strokeWeight(1.5);
 
                 line(this.pos.x, this.pos.y, this.prevPos.x, this.prevPos.y);
@@ -209,14 +200,15 @@
             }
 
             fade() {
-                this.opacity -= 4; // Se desvanece lentamente
+                this.opacity -= 4;  // Se desvanece lentamente
             }
         }
 
-        noLoop();  
+        noLoop();
     </script>
 </body>
 </html>
+
 
 
 
