@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Fluid Particle System with Enhanced Green Noise</title>
+    <title>Fluid Particle System with Enhanced Green Noise and Lines</title>
     <style>
         body, html {
             margin: 0;
@@ -24,40 +24,36 @@
         let flowfield;
         let maxSpeed = 0.3;
         let audioStarted = false;
-        let globalReverb, noiseOscillator, lfo, lowPassFilter;
+        let globalReverb, noiseOscillator, lfo;
 
-        let touchPoints = [];
+        let erasePoint;
 
         function setup() {
-            // Ajustar el canvas para dispositivos móviles
-            let canvas = createCanvas(windowWidth, windowHeight);
-            canvas.style('display', 'block');
-            canvas.parent(document.body);
-
-            pixelDensity(1); // Ajustar densidad de píxeles para móviles
-
+            createCanvas(windowWidth, windowHeight);
             cols = floor(width / scl);
             rows = floor(height / scl);
             flowfield = new Array(cols * rows);
 
             globalReverb = new p5.Reverb();
-            globalReverb.set(15, 10); // Reverberación más larga y envolvente
+            globalReverb.set(12, 8); 
 
-            // Configurar ruido blanco filtrado para simular ruido verde
+            // Configurar ruido verde más fuerte
             noiseOscillator = new p5.Noise('pink');
-            lowPassFilter = new p5.LowPass();
-            lowPassFilter.freq(500);
+            let lowPassFilter = new p5.LowPass();
+            lowPassFilter.freq(500); 
             noiseOscillator.disconnect();
             noiseOscillator.connect(lowPassFilter);
-            noiseOscillator.amp(0.05);  // Nivel bajo para el ruido verde
-            noiseOscillator.start();
+
+            // Aumentar la amplitud base del ruido verde
+            noiseOscillator.amp(0.5, 1);  // Aumentar la amplitud inicial del ruido verde
 
             lfo = new p5.Oscillator('sine');
-            lfo.freq(random(1 / 6, 1 / 4)); // Frecuencia entre 4 y 6 segundos
-            lfo.disconnect();
+            lfo.freq(random(1 / 7, 1 / 5)); 
+            lfo.disconnect();  
+            lfo.amp(0.8);  // Aumentar la amplitud del LFO para hacer el ruido verde mucho más notable
             lfo.start();
 
-            for (let i = 0; i < 300; i++) {
+            for (let i = 0; i < 500; i++) {
                 particles[i] = new Particle();
             }
 
@@ -67,7 +63,7 @@
         function draw() {
             if (!audioStarted) return;
 
-            background(0, 10); // Fondo negro con transparencia
+            background(0, 10); 
 
             let yoff = 0;
             for (let y = 0; y < rows; y++) {
@@ -88,69 +84,39 @@
                 particles[i].update();
                 particles[i].edges();
                 particles[i].show();
-            }
 
-            // Dibujar y manejar puntos de toque
-            for (let i = touchPoints.length - 1; i >= 0; i--) {
-                let t = touchPoints[i];
-                t.display();
-                t.fade();
-                if (t.opacity <= 0) {
-                    touchPoints.splice(i, 1); // Eliminar el punto si se desvanece
+                if (erasePoint && dist(erasePoint.x, erasePoint.y, particles[i].pos.x, particles[i].pos.y) < 50) {
+                    particles[i].pos = createVector(random(width), random(height)); 
                 }
             }
 
             zoff += 0.003;
 
-            // Ajustar la amplitud del ruido verde con LFO
-            let noiseAmplitude = map(lfo.getAmp(), -1, 1, 0.05, 0.2);  // Ajustar el rango de amplitud
-            noiseOscillator.amp(noiseAmplitude, 0.5); // Aplicar la modulación al ruido verde
+            // Ajustar la amplitud del ruido verde con LFO más notable
+            let noiseAmplitude = map(lfo.getAmp(), -1, 1, 0.3, 0.7);  // Aumentar el rango de amplitud para un mayor impacto
+            noiseOscillator.amp(noiseAmplitude, 0.6);  // Aplicar la amplitud al ruido verde
+
+            if (erasePoint) {
+                fill(0);
+                noStroke();
+                ellipse(erasePoint.x, erasePoint.y, 50);
+            }
         }
 
         function mousePressed() {
             if (!audioStarted) {
-                userStartAudio().then(() => {
-                    audioStarted = true;
-                    loop();
-                }).catch((err) => {
-                    console.log('Error al iniciar audio: ', err);
-                });
+                userStartAudio();  
+                audioStarted = true;
+                loop();  
             }
-            addTouchPoint(mouseX, mouseY); // Generar un punto de luz y activar un oscilador
         }
 
-        function touchStarted() {
-            if (!audioStarted) {
-                userStartAudio().then(() => {
-                    audioStarted = true;
-                    loop();
-                }).catch((err) => {
-                    console.log('Error al iniciar audio: ', err);
-                });
-            }
-            addTouchPoint(touchX, touchY); // Generar un punto de luz y activar un oscilador
-            return false; // Prevenir scrolling en dispositivos móviles
+        function touchMoved() {
+            erasePoint = createVector(mouseX, mouseY);
         }
 
-        function addTouchPoint(x, y) {
-            let t = new TouchPoint(x, y);
-            touchPoints.push(t);
-
-            // Activar una nueva frecuencia cuando se toca la pantalla
-            let osc = new p5.Oscillator('sine');
-            osc.freq(random(200, 700)); // Frecuencia entre 200 y 700 Hz
-            osc.amp(0);
-            osc.start();
-            osc.disconnect();
-            osc.connect(globalReverb); // Conectar a la reverberación
-
-            osc.amp(0.3, 0.2); // Fade in para la frecuencia
-            setTimeout(() => {
-                osc.amp(0, 2); // Fade out suave después de 10 segundos
-                setTimeout(() => {
-                    osc.stop(); // Detener el oscilador
-                }, 2000);
-            }, 10000);
+        function touchEnded() {
+            erasePoint = null; 
         }
 
         class Particle {
@@ -160,6 +126,18 @@
                 this.acc = createVector(0, 0);
                 this.maxSpeed = maxSpeed;
                 this.prevPos = this.pos.copy();
+
+                this.baseFreq = random(100, 7000);  
+                this.oscillator = new p5.Oscillator('sine');
+                this.oscillator.freq(this.baseFreq);
+                this.oscillator.amp(0);
+
+                this.oscillator.disconnect();
+                this.oscillator.connect(globalReverb);
+
+                this.shouldPlaySound = random(1) < 0.10;  
+                this.soundDuration = random(5000, 10000);  
+                this.nextSoundTime = millis() + random(3000, 10000);  
             }
 
             follow(vectors) {
@@ -179,14 +157,32 @@
                 this.vel.limit(this.maxSpeed);
                 this.pos.add(this.vel);
                 this.acc.mult(0);
+
+                let currentTime = millis();
+                if (this.shouldPlaySound && currentTime >= this.nextSoundTime) {
+                    this.oscillator.start();
+                    this.oscillator.amp(random(0.01, 0.02), 0.2);  // Reducir el volumen de los osciladores aún más
+                    setTimeout(() => {
+                        this.oscillator.amp(0.01, 0.2);  
+                        setTimeout(() => this.oscillator.stop(), 1000);  
+                    }, this.soundDuration - 1000);
+
+                    this.nextSoundTime = currentTime + random(3000, 10000);  
+                }
             }
 
             show() {
-                stroke(255, 100); // Color blanco tenue
-                strokeWeight(1.5);
+                stroke(255, 50);  
+                strokeWeight(1);
 
                 line(this.pos.x, this.pos.y, this.prevPos.x, this.prevPos.y);
                 this.prevPos = this.pos.copy();
+
+                // Crear líneas que conectan las partículas, con brillo tenue
+                let lineLength = 10;
+                stroke(255, 100);
+                strokeWeight(0.5);
+                line(this.pos.x, this.pos.y, this.pos.x + lineLength, this.pos.y + lineLength); // Línea diagonal conectando partículas
             }
 
             edges() {
@@ -198,32 +194,11 @@
             }
         }
 
-        class TouchPoint {
-            constructor(x, y) {
-                this.pos = createVector(x, y);
-                this.size = 50;
-                this.opacity = 255;
-            }
-
-            display() {
-                noStroke();
-                fill(255, 255, 255, this.opacity); // Luz blanca translúcida (neón)
-                ellipse(this.pos.x, this.pos.y, this.size);
-            }
-
-            fade() {
-                this.opacity -= 2; // Desvanecer lentamente
-            }
-        }
-
-        function windowResized() {
-            resizeCanvas(windowWidth, windowHeight); // Ajustar el canvas en móviles
-        }
-
-        noLoop(); // Evitar que el draw se ejecute hasta que el usuario interactúe
+        noLoop();  
     </script>
 </body>
 </html>
+
 
 
 
