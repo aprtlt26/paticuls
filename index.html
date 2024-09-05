@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Fluid Particle System with Green Noise</title>
+    <meta charset="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Fluid Particle System with Enhanced Green Noise</title>
     <style>
         body, html {
             margin: 0;
@@ -25,19 +25,23 @@
         let maxSpeed = 0.3;
         let audioStarted = false;
         let globalReverb, noiseOscillator, lfo, lowPassFilter;
+
         let touchPoints = [];
 
         function setup() {
-            createCanvas(windowWidth, windowHeight);
-            pixelDensity(1);  // Ajustar la densidad de píxeles para pantallas móviles
+            // Ajustar el canvas para dispositivos móviles
+            let canvas = createCanvas(windowWidth, windowHeight);
+            canvas.style('display', 'block');
+            canvas.parent(document.body);
+
+            pixelDensity(1); // Ajustar densidad de píxeles para móviles
 
             cols = floor(width / scl);
             rows = floor(height / scl);
             flowfield = new Array(cols * rows);
 
-            // Configurar reverberación global
             globalReverb = new p5.Reverb();
-            globalReverb.set(15, 10);
+            globalReverb.set(15, 10); // Reverberación más larga y envolvente
 
             // Configurar ruido blanco filtrado para simular ruido verde
             noiseOscillator = new p5.Noise('pink');
@@ -45,12 +49,11 @@
             lowPassFilter.freq(500);
             noiseOscillator.disconnect();
             noiseOscillator.connect(lowPassFilter);
-            noiseOscillator.amp(0.05);  // Nivel bajo para ruido verde
+            noiseOscillator.amp(0.05);  // Nivel bajo para el ruido verde
             noiseOscillator.start();
 
-            // LFO para modulación de amplitud del ruido verde
             lfo = new p5.Oscillator('sine');
-            lfo.freq(random(1 / 6, 1 / 4));  // Frecuencia entre 4 y 6 segundos
+            lfo.freq(random(1 / 6, 1 / 4)); // Frecuencia entre 4 y 6 segundos
             lfo.disconnect();
             lfo.start();
 
@@ -64,7 +67,7 @@
         function draw() {
             if (!audioStarted) return;
 
-            background(0, 10);  // Fondo negro con transparencia
+            background(0, 10); // Fondo negro con transparencia
 
             let yoff = 0;
             for (let y = 0; y < rows; y++) {
@@ -93,33 +96,40 @@
                 t.display();
                 t.fade();
                 if (t.opacity <= 0) {
-                    touchPoints.splice(i, 1);  // Eliminar punto si se desvanece
+                    touchPoints.splice(i, 1); // Eliminar el punto si se desvanece
                 }
             }
 
             zoff += 0.003;
 
-            // Modificar la amplitud del ruido verde con LFO
+            // Ajustar la amplitud del ruido verde con LFO
             let noiseAmplitude = map(lfo.getAmp(), -1, 1, 0.05, 0.2);  // Ajustar el rango de amplitud
-            noiseOscillator.amp(noiseAmplitude, 0.5);  // Aplicar la modulación al ruido
+            noiseOscillator.amp(noiseAmplitude, 0.5); // Aplicar la modulación al ruido verde
         }
 
         function mousePressed() {
             if (!audioStarted) {
-                userStartAudio();
-                audioStarted = true;
-                loop();
+                userStartAudio().then(() => {
+                    audioStarted = true;
+                    loop();
+                }).catch((err) => {
+                    console.log('Error al iniciar audio: ', err);
+                });
             }
-            addTouchPoint(mouseX, mouseY);  // Generar un punto de luz y activar un oscilador
+            addTouchPoint(mouseX, mouseY); // Generar un punto de luz y activar un oscilador
         }
 
         function touchStarted() {
             if (!audioStarted) {
-                userStartAudio();
-                audioStarted = true;
-                loop();
+                userStartAudio().then(() => {
+                    audioStarted = true;
+                    loop();
+                }).catch((err) => {
+                    console.log('Error al iniciar audio: ', err);
+                });
             }
-            addTouchPoint(touchX, touchY);  // Generar un punto de luz y activar un oscilador
+            addTouchPoint(touchX, touchY); // Generar un punto de luz y activar un oscilador
+            return false; // Prevenir scrolling en dispositivos móviles
         }
 
         function addTouchPoint(x, y) {
@@ -128,17 +138,17 @@
 
             // Activar una nueva frecuencia cuando se toca la pantalla
             let osc = new p5.Oscillator('sine');
-            osc.freq(random(200, 700));  // Frecuencia entre 200 y 700 Hz
+            osc.freq(random(200, 700)); // Frecuencia entre 200 y 700 Hz
             osc.amp(0);
             osc.start();
             osc.disconnect();
-            osc.connect(globalReverb);  // Conectar a la reverb
+            osc.connect(globalReverb); // Conectar a la reverberación
 
-            osc.amp(0.3, 0.2);  // Fade in para la frecuencia
+            osc.amp(0.3, 0.2); // Fade in para la frecuencia
             setTimeout(() => {
-                osc.amp(0, 2);  // Fade out suave después de 10 segundos
+                osc.amp(0, 2); // Fade out suave después de 10 segundos
                 setTimeout(() => {
-                    osc.stop();  // Detener el oscilador
+                    osc.stop(); // Detener el oscilador
                 }, 2000);
             }, 10000);
         }
@@ -172,7 +182,7 @@
             }
 
             show() {
-                stroke(255, 100);  // Color blanco tenue
+                stroke(255, 100); // Color blanco tenue
                 strokeWeight(1.5);
 
                 line(this.pos.x, this.pos.y, this.prevPos.x, this.prevPos.y);
@@ -197,16 +207,20 @@
 
             display() {
                 noStroke();
-                fill(255, 255, 255, this.opacity);  // Luz blanca translúcida (neón)
+                fill(255, 255, 255, this.opacity); // Luz blanca translúcida (neón)
                 ellipse(this.pos.x, this.pos.y, this.size);
             }
 
             fade() {
-                this.opacity -= 2;  // Desvanecer lentamente
+                this.opacity -= 2; // Desvanecer lentamente
             }
         }
 
-        noLoop();
+        function windowResized() {
+            resizeCanvas(windowWidth, windowHeight); // Ajustar el canvas en móviles
+        }
+
+        noLoop(); // Evitar que el draw se ejecute hasta que el usuario interactúe
     </script>
 </body>
 </html>
