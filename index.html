@@ -37,7 +37,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/addons/p5.sound.min.js"></script>
     <script>
         let inc = 0.1;
-        let scl = 20; // Cambiado a 20 para mayor visibilidad de partículas
+        let scl = 20; // Tamaño de la cuadrícula
         let cols, rows;
         let zoff = 0;
         let particles = [];
@@ -65,14 +65,17 @@
                 particles[i] = new Particle();
             }
 
-            background(0);
+            background(0); // Fondo negro para que las partículas se vean bien
             noLoop();  // Evitar que el draw se ejecute hasta que el usuario interactúe
         }
 
         function draw() {
             if (!audioStarted) return;
 
-            background(0, 30);  // Fondo semitransparente para visualizar las partículas mejor
+            // No borramos el fondo para dejar rastros permanentes
+            // Aumenta ligeramente la opacidad del fondo, permitiendo que los rastros se queden
+            fill(0, 5);
+            rect(0, 0, width, height);
 
             let yoff = 0;
             for (let y = 0; y < rows; y++) {
@@ -81,7 +84,7 @@
                     let index = x + y * cols;
                     let angle = noise(xoff, yoff, zoff) * TWO_PI;
                     let v = p5.Vector.fromAngle(angle);
-                    v.setMag(1);  // Magnitud ajustada para mayor fluidez
+                    v.setMag(1);  // Velocidad ajustada para fluidez
 
                     if (isInteracting) {
                         let mouseVector = createVector(mouseX - x * scl, mouseY - y * scl);
@@ -193,9 +196,9 @@
             }
 
             show() {
-                stroke(255, 100);
+                stroke(255, 100);  // Blanco con opacidad
                 strokeWeight(1);
-                line(this.pos.x, this.pos.y, this.prevPos.x, this.prevPos.y);
+                line(this.pos.x, this.pos.y, this.prevPos.x, this.prevPos.y);  // Línea entre la posición actual y la anterior
                 this.prevPos = this.pos.copy();
             }
 
