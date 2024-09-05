@@ -22,7 +22,7 @@
         let zoff = 0;
         let particles = [];
         let flowfield;
-        let maxSpeed = 0.3;
+        let maxSpeed = 0.6;
         let audioStarted = false;
         let globalReverb, noiseOscillator, lfo;
 
@@ -127,7 +127,7 @@
                 this.maxSpeed = maxSpeed;
                 this.prevPos = this.pos.copy();
 
-                this.baseFreq = random(100, 7000);  
+                this.baseFreq = random(100, 2000);  
                 this.oscillator = new p5.Oscillator('sine');
                 this.oscillator.freq(this.baseFreq);
                 this.oscillator.amp(0);
@@ -136,7 +136,7 @@
                 this.oscillator.connect(globalReverb);
 
                 this.shouldPlaySound = random(1) < 0.10;  
-                this.soundDuration = random(5000, 10000);  
+                this.soundDuration = random(500, 1000);  
                 this.nextSoundTime = millis() + random(3000, 10000);  
             }
 
@@ -161,7 +161,7 @@
                 let currentTime = millis();
                 if (this.shouldPlaySound && currentTime >= this.nextSoundTime) {
                     this.oscillator.start();
-                    this.oscillator.amp(random(0.01, 0.02), 0.2);  // Reducir el volumen de los osciladores aún más
+                    this.oscillator.amp(random(0.01, 0.02), 0.1);  // Reducir el volumen de los osciladores aún más
                     setTimeout(() => {
                         this.oscillator.amp(0.01, 0.2);  
                         setTimeout(() => this.oscillator.stop(), 1000);  
