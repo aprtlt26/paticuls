@@ -1,9 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Fluid Particle System with Sound</title>
+    <meta charset="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Fluid Particle System with Green Noise and Light Effects</title>
     <style>
         body, html {
             margin: 0;
@@ -35,15 +34,16 @@
             flowfield = new Array(cols * rows);
 
             globalReverb = new p5.Reverb();
-            globalReverb.set(12, 8);
+            globalReverb.set(20, 10);  // Reverberación profunda y amplia
 
-            // Configurar ruido blanco con filtro de paso bajo
-            noiseOscillator = new p5.Noise('white');
+            // Configurar ruido verde con filtro de paso bajo
+            noiseOscillator = new p5.Noise('pink');
             lowPassFilter = new p5.LowPass();
             lowPassFilter.freq(500);  // Filtro de paso bajo a 500 Hz
             noiseOscillator.disconnect();
             noiseOscillator.connect(lowPassFilter);
-            noiseOscillator.amp(0);
+            noiseOscillator.amp(0.8);  // Aumentar el volumen del ruido verde
+            noiseOscillator.start();
 
             lfo = new p5.Oscillator('sine');
             lfo.freq(random(1 / 6, 1 / 4));  // LFO entre 4 y 6 segundos
@@ -83,7 +83,7 @@
                 particles[i].show();
             }
 
-            // Dibujar el punto de luz al tocar
+            // Dibujar el punto de luz y gestionar su desvanecimiento
             for (let i = touchPoints.length - 1; i >= 0; i--) {
                 let t = touchPoints[i];
                 t.display();
@@ -95,8 +95,8 @@
 
             zoff += 0.003;
 
-            // Modificar la amplitud del ruido blanco con LFO
-            let noiseAmplitude = map(lfo.getAmp(), -1, 1, 0.3, 0.7);  // Amplitud modulada del ruido
+            // Modificar la amplitud del ruido verde con LFO
+            let noiseAmplitude = map(lfo.getAmp(), -1, 1, 0.6, 1);  // Aumentar la amplitud modulada del ruido
             noiseOscillator.amp(noiseAmplitude, 0.5);  // Aplicar la amplitud modulada al ruido
         }
 
@@ -107,7 +107,7 @@
                 loop();
             }
 
-            addTouchPoint(mouseX, mouseY);  // Agregar el punto de luz y activar un oscilador
+            addTouchPoint(mouseX, mouseY);  // Generar un punto de luz y activar un oscilador
         }
 
         function touchStarted() {
@@ -117,7 +117,7 @@
                 loop();
             }
 
-            addTouchPoint(touchX, touchY);  // Agregar el punto de luz y activar un oscilador
+            addTouchPoint(touchX, touchY);  // Generar un punto de luz y activar un oscilador
         }
 
         function addTouchPoint(x, y) {
@@ -189,18 +189,18 @@
         class TouchPoint {
             constructor(x, y) {
                 this.pos = createVector(x, y);
-                this.size = 20;
+                this.size = 30;
                 this.opacity = 255;
             }
 
             display() {
                 noStroke();
-                fill(255, this.opacity);  // Luz blanca
+                fill(255, 255, 255, this.opacity);  // Luz blanca translúcida (neón)
                 ellipse(this.pos.x, this.pos.y, this.size);
             }
 
             fade() {
-                this.opacity -= 4;  // Se desvanece lentamente
+                this.opacity -= 3;  // Se desvanece lentamente
             }
         }
 
@@ -208,6 +208,7 @@
     </script>
 </body>
 </html>
+
 
 
 
