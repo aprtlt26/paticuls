@@ -63,7 +63,7 @@
         function draw() {
             if (!audioStarted) return;
 
-            background(0, 20); // Fondo más transparente para mantener líneas blancas más visibles
+            background(0, 10); // Fondo más transparente para mantener líneas blancas más visibles
 
             let yoff = 0;
             for (let y = 0; y < rows; y++) {
@@ -97,7 +97,7 @@
             noiseOscillator.amp(noiseAmplitude, 0.6);  // Aplicar la amplitud al ruido verde
 
             if (erasePoint) {
-                fill(0);
+                fill(255, this.opacity);
                 noStroke();
                 ellipse(erasePoint.x, erasePoint.y, 50);
             }
