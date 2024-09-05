@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Fluid Particle System with Enhanced Green Noise and Lines</title>
     <style>
         body, html {
@@ -63,7 +63,7 @@
         function draw() {
             if (!audioStarted) return;
 
-            background(0, 10); 
+            background(0, 20); // Fondo más transparente para mantener líneas blancas más visibles
 
             let yoff = 0;
             for (let y = 0; y < rows; y++) {
@@ -172,16 +172,16 @@
             }
 
             show() {
-                stroke(255, 50);  
-                strokeWeight(1);
+                stroke(255, 255);  // Líneas más blancas y visibles
+                strokeWeight(1.5);
 
                 line(this.pos.x, this.pos.y, this.prevPos.x, this.prevPos.y);
                 this.prevPos = this.pos.copy();
 
-                // Crear líneas que conectan las partículas, con brillo tenue
+                // Crear líneas que conectan las partículas, con brillo más brillante
                 let lineLength = 10;
-                stroke(255, 100);
-                strokeWeight(0.5);
+                stroke(255, 200);
+                strokeWeight(1);
                 line(this.pos.x, this.pos.y, this.pos.x + lineLength, this.pos.y + lineLength); // Línea diagonal conectando partículas
             }
 
@@ -194,10 +194,16 @@
             }
         }
 
+        // Prevenir desplazamiento en móviles
+        window.addEventListener('touchmove', function(event) {
+            event.preventDefault();
+        }, { passive: false });
+
         noLoop();  
     </script>
 </body>
 </html>
+
 
 
 
