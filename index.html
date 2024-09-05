@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Fluid Particle System with Green Noise and Light Effects</title>
+    <title>Interactive Fluid Particle System with Green Noise</title>
     <style>
         body, html {
             margin: 0;
@@ -29,28 +29,32 @@
 
         function setup() {
             createCanvas(windowWidth, windowHeight);
+            pixelDensity(1);  // Ajustar la densidad de píxeles para pantallas móviles
+
             cols = floor(width / scl);
             rows = floor(height / scl);
             flowfield = new Array(cols * rows);
 
+            // Configurar reverberación global
             globalReverb = new p5.Reverb();
-            globalReverb.set(20, 10);  // Reverberación profunda y amplia
+            globalReverb.set(15, 10);
 
-            // Configurar ruido verde con filtro de paso bajo
+            // Configurar ruido blanco filtrado para simular ruido verde
             noiseOscillator = new p5.Noise('pink');
             lowPassFilter = new p5.LowPass();
-            lowPassFilter.freq(500);  // Filtro de paso bajo a 500 Hz
+            lowPassFilter.freq(500);
             noiseOscillator.disconnect();
             noiseOscillator.connect(lowPassFilter);
-            noiseOscillator.amp(0.8);  // Aumentar el volumen del ruido verde
+            noiseOscillator.amp(0.05);  // Nivel bajo para ruido verde
             noiseOscillator.start();
 
+            // LFO para modulación de amplitud del ruido verde
             lfo = new p5.Oscillator('sine');
-            lfo.freq(random(1 / 6, 1 / 4));  // LFO entre 4 y 6 segundos
+            lfo.freq(random(1 / 6, 1 / 4));  // Frecuencia entre 4 y 6 segundos
             lfo.disconnect();
             lfo.start();
 
-            for (let i = 0; i < 500; i++) {
+            for (let i = 0; i < 300; i++) {
                 particles[i] = new Particle();
             }
 
@@ -83,21 +87,21 @@
                 particles[i].show();
             }
 
-            // Dibujar el punto de luz y gestionar su desvanecimiento
+            // Dibujar y manejar puntos de toque
             for (let i = touchPoints.length - 1; i >= 0; i--) {
                 let t = touchPoints[i];
                 t.display();
                 t.fade();
                 if (t.opacity <= 0) {
-                    touchPoints.splice(i, 1);  // Eliminar si se desvanece completamente
+                    touchPoints.splice(i, 1);  // Eliminar punto si se desvanece
                 }
             }
 
             zoff += 0.003;
 
             // Modificar la amplitud del ruido verde con LFO
-            let noiseAmplitude = map(lfo.getAmp(), -1, 1, 0.6, 1);  // Aumentar la amplitud modulada del ruido
-            noiseOscillator.amp(noiseAmplitude, 0.5);  // Aplicar la amplitud modulada al ruido
+            let noiseAmplitude = map(lfo.getAmp(), -1, 1, 0.05, 0.2);  // Ajustar el rango de amplitud
+            noiseOscillator.amp(noiseAmplitude, 0.5);  // Aplicar la modulación al ruido
         }
 
         function mousePressed() {
@@ -106,7 +110,6 @@
                 audioStarted = true;
                 loop();
             }
-
             addTouchPoint(mouseX, mouseY);  // Generar un punto de luz y activar un oscilador
         }
 
@@ -116,7 +119,6 @@
                 audioStarted = true;
                 loop();
             }
-
             addTouchPoint(touchX, touchY);  // Generar un punto de luz y activar un oscilador
         }
 
@@ -132,7 +134,7 @@
             osc.disconnect();
             osc.connect(globalReverb);  // Conectar a la reverb
 
-            osc.amp(0.5, 0.2);  // Fade in para la frecuencia
+            osc.amp(0.3, 0.2);  // Fade in para la frecuencia
             setTimeout(() => {
                 osc.amp(0, 2);  // Fade out suave después de 10 segundos
                 setTimeout(() => {
@@ -170,7 +172,7 @@
             }
 
             show() {
-                stroke(255, 200, 0, 50);  // Colores cálidos y vibrantes
+                stroke(255, 100);  // Color blanco tenue
                 strokeWeight(1.5);
 
                 line(this.pos.x, this.pos.y, this.prevPos.x, this.prevPos.y);
@@ -189,7 +191,7 @@
         class TouchPoint {
             constructor(x, y) {
                 this.pos = createVector(x, y);
-                this.size = 30;
+                this.size = 50;
                 this.opacity = 255;
             }
 
@@ -200,7 +202,7 @@
             }
 
             fade() {
-                this.opacity -= 3;  // Se desvanece lentamente
+                this.opacity -= 2;  // Desvanecer lentamente
             }
         }
 
@@ -208,6 +210,7 @@
     </script>
 </body>
 </html>
+
 
 
 
