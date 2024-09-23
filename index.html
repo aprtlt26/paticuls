@@ -53,17 +53,17 @@
             lfo.amp(0.8);  // Aumentar la amplitud del LFO para hacer el ruido verde mucho más notable
             lfo.start();
 
-            for (let i = 0; i < 500; i++) {
+            for (let i = 0; i < 200; i++) {
                 particles[i] = new Particle();
             }
 
-            background(0);
+            background (180);
         }
 
         function draw() {
             if (!audioStarted) return;
 
-            background(0, 20); // Fondo más transparente para mantener líneas blancas más visibles
+            background(140, 10); // Fondo más transparente para mantener líneas blancas más visibles
 
             let yoff = 0;
             for (let y = 0; y < rows; y++) {
@@ -97,9 +97,9 @@
             noiseOscillator.amp(noiseAmplitude, 0.6);  // Aplicar la amplitud al ruido verde
 
             if (erasePoint) {
-                fill(0);
+                fill(10);
                 noStroke();
-                ellipse(erasePoint.x, erasePoint.y, 50);
+                ellipse(erasePoint.x, erasePoint.y, 800);
             }
         }
 
@@ -173,15 +173,15 @@
 
             show() {
                 stroke(255, 255);  // Líneas más blancas y visibles
-                strokeWeight(1.5);
+                strokeWeight(5.5);
 
                 line(this.pos.x, this.pos.y, this.prevPos.x, this.prevPos.y);
                 this.prevPos = this.pos.copy();
 
                 // Crear líneas que conectan las partículas, con brillo más brillante
-                let lineLength = 10;
-                stroke(255, 200);
-                strokeWeight(1);
+                let lineLength = 100;
+                stroke(25, 20);
+                strokeWeight(0.1);
                 line(this.pos.x, this.pos.y, this.pos.x + lineLength, this.pos.y + lineLength); // Línea diagonal conectando partículas
             }
 
@@ -203,6 +203,14 @@
     </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
 
 
 
