@@ -2,211 +2,415 @@
 <html lang="en">
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>aprtlt®art&PsychGray</title>
+    <title>MALDEK | Living Membrane</title>
     <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            background: black;
-                        cursor: none;  
-
-        }
+        body, html { margin: 0; padding: 0; overflow: hidden; background: #000; cursor: none; }
+        canvas { display: block; }
     </style>
 </head>
 <body>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/addons/p5.sound.min.js"></script>
     <script>
-        let inc = 0.05;
-        let scl = 10;
-        let cols, rows;
-        let zoff = 0;
-        let particles = [];
-        let flowfield;
-        let maxSpeed = 0.6;
+    
+        let audioCtx = null;
+        let masterGainNode = null;
         let audioStarted = false;
-        let globalReverb, noiseOscillator, lfo;
+        let masterVolume = 0.7;
+        let isMuted = false;
+        let globalReverb;
 
-        let erasePoint;
+        const VOICE_COUNT = 50;
+        let voicePool = [];
+        let voiceAmplitudes = new Float32Array(VOICE_COUNT);
+        let voiceFreqs = new Float32Array(VOICE_COUNT);
+        let voiceTargetFreqs = new Float32Array(VOICE_COUNT);
+
+        function initSpatialAudio() {
+            try {
+                audioCtx = getAudioContext();
+                if (!audioCtx) return;
+                masterGainNode = audioCtx.createGain();
+                masterGainNode.gain.value = 0.6;
+                masterGainNode.connect(audioCtx.destination);
+                if (audioCtx.listener) {
+                    audioCtx.listener.positionX.value = 0;
+                    audioCtx.listener.positionY.value = 0;
+                    audioCtx.listener.positionZ.value = 0;
+                    audioCtx.listener.forwardX.value = 0;
+                    audioCtx.listener.forwardY.value = 0;
+                    audioCtx.listener.forwardZ.value = -1;
+                    audioCtx.listener.upX.value = 0;
+                    audioCtx.listener.upY.value = 1;
+                    audioCtx.listener.upZ.value = 0;
+                }
+            } catch(e) { console.warn('Audio init error:', e); }
+        }
+
+        function createVoicePanner(idx) {
+            if (!audioCtx) return null;
+            let panner = audioCtx.createPanner();
+            panner.panningModel = 'HRTF';
+            panner.distanceModel = 'inverse';
+            panner.refDistance = 1.5;
+            panner.maxDistance = 40;
+            panner.rolloffFactor = 0.7;
+            panner.coneInnerAngle = 360;
+            panner.coneOuterAngle = 0;
+            panner.coneOuterGain = 0;
+            let angle = (idx / VOICE_COUNT) * TWO_PI * 2.7;
+            panner.positionX.value = Math.cos(angle) * 3;
+            panner.positionY.value = Math.sin(angle * 0.6) * 2.5;
+            panner.positionZ.value = Math.sin(angle) * 2 + 5;
+            if (masterGainNode) panner.connect(masterGainNode);
+            else panner.connect(audioCtx.destination);
+            return panner;
+        }
+
+        function initVoices() {
+            globalReverb = new p5.Reverb();
+            globalReverb.set(2, 6);
+            for (let i = 0; i < VOICE_COUNT; i++) {
+                let osc = new p5.Oscillator('sine');
+                let freq = random(60, 500);
+                osc.freq(freq);
+                osc.amp(0);
+                osc.disconnect();
+                osc.connect(globalReverb);
+                let panner = createVoicePanner(i);
+                if (panner) {
+                    try {
+                        if (osc._gainNode) { osc._gainNode.disconnect(); osc._gainNode.connect(panner); }
+                        else { osc.disconnect(); osc.connect(panner); }
+                    } catch(e) { try { osc.disconnect(); osc.connect(panner); } catch(e2) {} }
+                }
+                osc.start();
+                voicePool.push({ osc, panner, freq });
+                voiceFreqs[i] = freq;
+                voiceTargetFreqs[i] = freq;
+                voiceAmplitudes[i] = random(0.02, 0.05);
+                osc.amp(voiceAmplitudes[i] * masterVolume, 1.5);
+            }
+        }
+
+        function updateVoices(brightnessMap) {
+            let time = millis() * 0.001;
+            for (let i = 0; i < VOICE_COUNT; i++) {
+                let v = voicePool[i];
+                if (!v) continue;
+                let idx = floor(i / VOICE_COUNT * totalCells);
+                let b = brightnessMap[idx % totalCells] || 0.5;
+                let targetFreq = 50 + b * 600 + sin(time * 0.15 + i * 0.5) * 80;
+                voiceTargetFreqs[i] += (targetFreq - voiceTargetFreqs[i]) * 0.003;
+                v.osc.freq(voiceTargetFreqs[i]);
+                let targetAmp = (0.015 + b * 0.1) * masterVolume;
+                voiceAmplitudes[i] += (targetAmp - voiceAmplitudes[i]) * 0.015;
+                v.osc.amp(voiceAmplitudes[i], 0.05);
+                if (v.panner) {
+                    let x3d = map(b, 0, 1, -8, 8) + sin(time * 0.08 + i) * 0.8;
+                    let y3d = map(sin(time * 0.06 + i * 0.7), -1, 1, -5, 5);
+                    let z3d = 2 + b * 8 + sin(time * 0.05 + i * 0.4) * 2;
+                    try {
+                        v.panner.positionX.value = x3d;
+                        v.panner.positionY.value = y3d;
+                        v.panner.positionZ.value = z3d;
+                    } catch(e) {}
+                }
+            }
+        }
+
+
+        let gridSize = 5;
+        let cols, rows;
+        let totalCells;
+        let cx, cy, bright, phase, state, velX, velY;
+        let time = 0;
+        let frame = 0;
+        let pg;
 
         function setup() {
             createCanvas(windowWidth, windowHeight);
-            cols = floor(width / scl);
-            rows = floor(height / scl);
-            flowfield = new Array(cols * rows);
+            pixelDensity(1);
+            initSpatialAudio();
+            initVoices();
 
-            globalReverb = new p5.Reverb();
-            globalReverb.set(12, 8); 
+            cols = floor(width / gridSize);
+            rows = floor(height / gridSize);
+            totalCells = cols * rows;
 
-            // Configurar ruido verde más fuerte
-            noiseOscillator = new p5.Noise('pink');
-            let lowPassFilter = new p5.LowPass();
-            lowPassFilter.freq(500); 
-            noiseOscillator.disconnect();
-            noiseOscillator.connect(lowPassFilter);
+            cx = new Float32Array(totalCells);
+            cy = new Float32Array(totalCells);
+            bright = new Float32Array(totalCells);
+            phase = new Float32Array(totalCells);
+            velX = new Float32Array(totalCells);
+            velY = new Float32Array(totalCells);
+            state = new Uint8Array(totalCells);
 
-            // Aumentar la amplitud base del ruido verde
-            noiseOscillator.amp(0.5, 1);  // Aumentar la amplitud inicial del ruido verde
-
-            lfo = new p5.Oscillator('sine');
-            lfo.freq(random(1 / 7, 1 / 5)); 
-            lfo.disconnect();  
-            lfo.amp(0.8);  // Aumentar la amplitud del LFO para hacer el ruido verde mucho más notable
-            lfo.start();
-
-            for (let i = 0; i < 200; i++) {
-                particles[i] = new Particle();
+            for (let i = 0; i < totalCells; i++) {
+                let x = (i % cols) * gridSize + gridSize/2;
+                let y = floor(i / cols) * gridSize + gridSize/2;
+                cx[i] = x;
+                cy[i] = y;
+                bright[i] = random(0.2, 0.8);
+                phase[i] = random(TWO_PI);
+                state[i] = 0;
             }
 
-            background (180);
+            pg = createGraphics(width, height);
+            pg.background(0);
+            background(0);
+            noLoop();
+            initUI();
         }
 
         function draw() {
             if (!audioStarted) return;
+            frame++;
+            time = millis();
 
-            background(140, 10); // Fondo más transparente para mantener líneas blancas más visibles
+            let waveTime = time * 0.00018;
+            let mouseNormX = mouseX / width;
+            let mouseNormY = mouseY / height;
 
-            let yoff = 0;
-            for (let y = 0; y < rows; y++) {
-                let xoff = 0;
-                for (let x = 0; x < cols; x++) {
-                    let index = x + y * cols;
-                    let angle = noise(xoff, yoff, zoff) * TWO_PI;
-                    let v = p5.Vector.fromAngle(angle);
-                    v.setMag(0.5);
-                    flowfield[index] = v;
-                    xoff += inc;
+            pg.background(0, 12);
+
+     
+            for (let i = 0; i < totalCells; i++) {
+                let col = i % cols;
+                let row = (i / cols) | 0;
+                let baseX = col * gridSize + gridSize * 0.5;
+                let baseY = row * gridSize + gridSize * 0.5;
+                let nx = col / cols;
+                let ny = row / rows;
+
+                let w1 = sin(nx * 16 - waveTime * 18 + ny * 10) * 0.5 + 0.5;
+                let w2 = cos(ny * 14 - waveTime * 14 + nx * 12) * 0.5 + 0.5;
+                let w3 = sin((nx + ny) * 12 - waveTime * 22) * 0.5 + 0.5;
+                let w4 = sin(nx * 20 + waveTime * 16 - ny * 8) * 0.5 + 0.5;
+                let w5 = cos(nx * 10 - waveTime * 10 + ny * 18) * 0.5 + 0.5;
+
+                let combined = w1 * 0.2 + w2 * 0.2 + w3 * 0.15 + w4 * 0.15 + w5 * 0.1;
+                combined = Math.max(0, Math.min(1, combined));
+
+                let dx = nx - mouseNormX;
+                let dy = ny - mouseNormY;
+                let distM = dx*dx + dy*dy;
+                let ripple = 0;
+                if (distM < 0.25) {
+                    let t = 1 - Math.sqrt(distM) / 0.5;
+                    ripple = sin(Math.sqrt(distM) * 60 - time * 0.0025) * t * 0.7;
                 }
-                yoff += inc;
+
+                let b = combined + ripple * 0.25;
+                b = Math.max(0, Math.min(1, b));
+                bright[i] += (b - bright[i]) * 0.06;
+
+                let dispScale = 14 + ripple * 6;
+                let flowX = sin(nx * 10 + waveTime * 6) * 0.6 + cos(ny * 8 + waveTime * 4) * 0.5 + ripple * 0.8;
+                let flowY = cos(ny * 10 + waveTime * 6) * 0.6 + sin(nx * 8 + waveTime * 4) * 0.5 + ripple * 0.8;
+                
+                let dxCell = flowX * dispScale;
+                let dyCell = flowY * dispScale;
+
+                cx[i] += ((baseX + dxCell) - cx[i]) * 0.08;
+                cy[i] += ((baseY + dyCell) - cy[i]) * 0.08;
+
+                let br = bright[i];
+                let isGreen = (br > 0.7 && (combined > 0.5 || ripple > 0.1));
+                if (isGreen) {
+                    state[i] = 3;
+                } else if (br > 0.5) {
+                    state[i] = 2;
+                } else if (br > 0.25) {
+                    state[i] = 1;
+                } else {
+                    state[i] = 0;
+                }
+
+                phase[i] += 0.03 + flowX * 0.02 + flowY * 0.02 + ripple * 0.04;
             }
 
-            for (let i = 0; i < particles.length; i++) {
-                particles[i].follow(flowfield);
-                particles[i].update();
-                particles[i].edges();
-                particles[i].show();
+        
+            pg.noStroke();
+            for (let i = 0; i < totalCells; i++) {
+                let x = cx[i];
+                let y = cy[i];
+                let b = bright[i];
+                let s = state[i];
+                let p = phase[i];
 
-                if (erasePoint && dist(erasePoint.x, erasePoint.y, particles[i].pos.x, particles[i].pos.y) < 50) {
-                    particles[i].pos = createVector(random(width), random(height)); 
+                let size = gridSize * (0.5 + 0.5 * b);
+                let rot = sin(p) * 0.12;
+
+                let r, g, bv;
+                if (s === 3) {
+                    let intensity = Math.min(1, (b - 0.5) * 5);
+                    r = 40 + intensity * 80;
+                    g = 210 + intensity * 45;
+                    bv = 30 + intensity * 60;
+                } else if (s === 2) {
+                    let w = 210 + 45 * b;
+                    r = w; g = w; bv = w;
+                } else if (s === 1) {
+                    let w = 90 + 130 * b;
+                    r = w; g = w; bv = w;
+                } else {
+                    let w = 15 + 50 * b;
+                    r = w; g = w; bv = w;
+                }
+
+                pg.fill(r, g, bv);
+                pg.push();
+                pg.translate(x, y);
+                pg.rotate(rot);
+                pg.rectMode(CENTER);
+                pg.rect(0, 0, size, size);
+                pg.pop();
+
+                if (s === 3) {
+                    let glow = Math.min(150, (b - 0.5) * 350);
+                    pg.noStroke();
+                    pg.fill(40, 255, 120, glow * 0.2);
+                    pg.ellipse(x, y, size * 4, size * 4);
+                    pg.fill(40, 255, 120, glow * 0.08);
+                    pg.ellipse(x, y, size * 8, size * 8);
                 }
             }
 
-            zoff += 0.003;
+            image(pg, 0, 0);
 
-            // Ajustar la amplitud del ruido verde con LFO más notable
-            let noiseAmplitude = map(lfo.getAmp(), -1, 1, 0.3, 0.7);  // Aumentar el rango de amplitud para un mayor impacto
-            noiseOscillator.amp(noiseAmplitude, 0.6);  // Aplicar la amplitud al ruido verde
+            updateVoices(bright);
 
-            if (erasePoint) {
-                fill(10);
-                noStroke();
-                ellipse(erasePoint.x, erasePoint.y, 800);
-            }
+            noFill();
+            stroke(255, 255, 255, 25);
+            strokeWeight(1);
+            rectMode(CENTER);
+            rect(mouseX, mouseY, 30, 30);
+            stroke(40, 255, 120, 30);
+            rect(mouseX, mouseY, 50, 50);
         }
 
+   
         function mousePressed() {
             if (!audioStarted) {
-                userStartAudio();  
+                userStartAudio();
                 audioStarted = true;
-                loop();  
+                if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+                loop();
             }
         }
 
-        function touchMoved() {
-            erasePoint = createVector(mouseX, mouseY);
+        function touchStarted() {
+            if (!audioStarted) {
+                userStartAudio();
+                audioStarted = true;
+                if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+                loop();
+            }
+            return false;
         }
 
-        function touchEnded() {
-            erasePoint = null; 
+        function windowResized() {
+            resizeCanvas(windowWidth, windowHeight);
+            cols = floor(width / gridSize);
+            rows = floor(height / gridSize);
+            totalCells = cols * rows;
+            cx = new Float32Array(totalCells);
+            cy = new Float32Array(totalCells);
+            bright = new Float32Array(totalCells);
+            phase = new Float32Array(totalCells);
+            velX = new Float32Array(totalCells);
+            velY = new Float32Array(totalCells);
+            state = new Uint8Array(totalCells);
+            for (let i = 0; i < totalCells; i++) {
+                let x = (i % cols) * gridSize + gridSize/2;
+                let y = floor(i / cols) * gridSize + gridSize/2;
+                cx[i] = x;
+                cy[i] = y;
+                bright[i] = random(0.2, 0.8);
+                phase[i] = random(TWO_PI);
+                state[i] = 0;
+            }
+            pg = createGraphics(width, height);
+            pg.background(0);
         }
 
-        class Particle {
-            constructor() {
-                this.pos = createVector(random(width), random(height));
-                this.vel = createVector(0, 0);
-                this.acc = createVector(0, 0);
-                this.maxSpeed = maxSpeed;
-                this.prevPos = this.pos.copy();
+       
+        function initUI() {
+            const binauralBtn = document.createElement('button');
+            binauralBtn.id = 'binauralBtn';
+            binauralBtn.innerHTML = '🎧';
+            binauralBtn.style.cssText = `
+                position: fixed; top: 16px; right: 16px; z-index: 999999;
+                width: 32px; height: 32px; border: none; border-radius: 50%;
+                background: rgba(20,20,20,0.8); color: #888; font-size: 14px;
+                cursor: pointer; border: 1px solid rgba(255,255,255,0.05);
+            `;
+            document.body.appendChild(binauralBtn);
 
-                this.baseFreq = random(100, 2000);  
-                this.oscillator = new p5.Oscillator('sine');
-                this.oscillator.freq(this.baseFreq);
-                this.oscillator.amp(0);
+            const ui = document.createElement('div');
+            ui.id = 'audioUI';
+            ui.style.cssText = `
+                position: fixed; bottom: 16px; right: 16px; z-index: 999998;
+                display: flex; align-items: center; gap: 6px;
+                background: rgba(0,0,0,0.4); padding: 6px 10px;
+                border-radius: 16px; border: 1px solid rgba(255,255,255,0.05);
+            `;
+            ui.innerHTML = `
+                <button id="muteBtn" style="width:20px;height:20px;border:none;border-radius:50%;background:rgba(30,30,30,0.8);color:#888;font-size:9px;cursor:pointer;">M</button>
+                <input type="range" id="masterSlider" min="0" max="2" step="0.01" value="0.7" style="width:80px;height:2px;appearance:none;background:rgba(255,255,255,0.15);outline:none;">
+            `;
+            document.body.appendChild(ui);
 
-                this.oscillator.disconnect();
-                this.oscillator.connect(globalReverb);
+            const overlay = document.createElement('div');
+            overlay.id = 'binauralOverlay';
+            overlay.style.cssText = `
+                position: fixed; top:0; left:0; width:100%; height:100%;
+                background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+                z-index: 1000000; display: flex; align-items: center; justify-content: center;
+                opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+            `;
+            overlay.innerHTML = `
+                <div style="background:rgba(15,15,15,0.9);border-radius:16px;padding:30px 40px;max-width:320px;width:90%;border:1px solid rgba(255,255,255,0.05);text-align:center;color:#aaa;">
+                    <div style="font-size:32px;margin-bottom:8px;">🎧</div>
+                    <h2 style="color:#888;font-size:16px;margin:8px 0;font-weight:300;letter-spacing:2px;">3D SPATIAL AUDIO</h2>
+                    <p style="font-size:12px;color:#666;line-height:1.6;">HRTF binaural rendering.<br>Use headphones for full experience.</p>
+                    <button id="closeBinaural" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.05);color:#888;padding:8px 24px;border-radius:20px;cursor:pointer;font-size:10px;margin-top:12px;">⟡ ok</button>
+                </div>
+            `;
+            document.body.appendChild(overlay);
 
-                this.shouldPlaySound = random(1) < 0.10;  
-                this.soundDuration = random(500, 1000);  
-                this.nextSoundTime = millis() + random(3000, 10000);  
-            }
+            const style = document.createElement('style');
+            style.innerHTML = `
+                #masterSlider::-webkit-slider-thumb { appearance: none; width: 10px; height: 10px; border-radius: 50%; background: #666; cursor: pointer; }
+                #binauralOverlay.active { opacity: 1; pointer-events: all; }
+            `;
+            document.head.appendChild(style);
 
-            follow(vectors) {
-                let x = floor(this.pos.x / scl);
-                let y = floor(this.pos.y / scl);
-                let index = x + y * cols;
-                let force = vectors[index];
-                this.applyForce(force);
-            }
+            const slider = document.getElementById('masterSlider');
+            const muteBtn = document.getElementById('muteBtn');
+            const binauralBtnEl = document.getElementById('binauralBtn');
 
-            applyForce(force) {
-                this.acc.add(force);
-            }
+            slider.addEventListener('input', e => {
+                masterVolume = parseFloat(e.target.value);
+                if (masterGainNode) masterGainNode.gain.value = masterVolume * 0.6;
+            });
 
-            update() {
-                this.vel.add(this.acc);
-                this.vel.limit(this.maxSpeed);
-                this.pos.add(this.vel);
-                this.acc.mult(0);
+            muteBtn.addEventListener('click', () => {
+                isMuted = !isMuted;
+                if (isMuted) { muteBtn.innerHTML = 'X'; if (masterGainNode) masterGainNode.gain.value = 0; }
+                else { muteBtn.innerHTML = 'M'; if (masterGainNode) masterGainNode.gain.value = masterVolume * 0.6; }
+            });
 
-                let currentTime = millis();
-                if (this.shouldPlaySound && currentTime >= this.nextSoundTime) {
-                    this.oscillator.start();
-                    this.oscillator.amp(random(0.01, 0.02), 0.1);  // Reducir el volumen de los osciladores aún más
-                    setTimeout(() => {
-                        this.oscillator.amp(0.01, 0.2);  
-                        setTimeout(() => this.oscillator.stop(), 1000);  
-                    }, this.soundDuration - 1000);
-
-                    this.nextSoundTime = currentTime + random(3000, 10000);  
-                }
-            }
-
-            show() {
-                stroke(255, 255);  // Líneas más blancas y visibles
-                strokeWeight(5.5);
-
-                line(this.pos.x, this.pos.y, this.prevPos.x, this.prevPos.y);
-                this.prevPos = this.pos.copy();
-
-                // Crear líneas que conectan las partículas, con brillo más brillante
-                let lineLength = 100;
-                stroke(25, 20);
-                strokeWeight(0.1);
-                line(this.pos.x, this.pos.y, this.pos.x + lineLength, this.pos.y + lineLength); // Línea diagonal conectando partículas
-            }
-
-            edges() {
-                if (this.pos.x > width) this.pos.x = 0;
-                if (this.pos.x < 0) this.pos.x = width;
-                if (this.pos.y > height) this.pos.y = 0;
-                if (this.pos.y < 0) this.pos.y = height;
-                this.prevPos = this.pos.copy();
-            }
+            binauralBtnEl.addEventListener('click', () => overlay.classList.add('active'));
+            document.getElementById('closeBinaural').addEventListener('click', () => overlay.classList.remove('active'));
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.classList.remove('active'); });
         }
 
-        // Prevenir desplazamiento en móviles
-        window.addEventListener('touchmove', function(event) {
-            event.preventDefault();
-        }, { passive: false });
-
-        noLoop();  
+        noLoop();
     </script>
 </body>
 </html>
-
-
 
 
 
